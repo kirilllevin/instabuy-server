@@ -1,3 +1,5 @@
+import httplib
+import response_utils
 import user_utils
 import models
 import webapp2
@@ -17,26 +19,29 @@ class Register(webapp2.RequestHandler):
         # Use the token to get the Facebook user id.
         try:
             fb_user_id = user_utils.get_facebook_user_id(fb_access_token)
+        except user_utils.FacebookTokenExpiredException:
+            self.response.status_int = httplib.BAD_REQUEST
+            self.response.write(response_utils.make_fb_token_expired_response())
+            return
         except user_utils.FacebookException as e:
             self.response.write('Couldn\'t retrieve Facebook user ID. '
-                                'Error:\n{}'.format(e))
+                                'Error: {}'.format(e))
             return
 
         # Check if the user is already registered.
         query = models.User.query(models.User.third_party_id == fb_user_id)
         query_iterator = query.iter()
         if query_iterator.has_next():
-            self.response.write('Account already exists!\n'
-                                'key={}'.format(query_iterator.next().key))
+            self.response.write('Account already exists: key={}'.format(
+                query_iterator.next().key))
             return
 
         # Store a new user entry.
         user = models.User(login_type='facebook',
                            third_party_id=fb_user_id)
         user_key = user.put()
-        self.response.write('Registered new user\n'
-                            'key={}\n'
-                            'user={}'.format(user_key, user))
+        self.response.write('Registered new user: key={}user={}'.format(
+            user_key, user))
 
 
 class ClearAllEntry(webapp2.RequestHandler):
@@ -52,9 +57,13 @@ class PostItem(webapp2.RequestHandler):
         # Retrieve the user associated with the Facebook token.
         try:
             user = user_utils.get_user_key_from_facebook_token(fb_access_token)
+        except user_utils.FacebookTokenExpiredException:
+            self.response.status_int = httplib.BAD_REQUEST
+            self.response.write(response_utils.make_fb_token_expired_response())
+            return
         except user_utils.FacebookException as e:
             self.response.write('Couldn\'t retrieve Facebook user ID. '
-                                'Error:\n{}'.format(e))
+                                'Error: {}'.format(e))
             return
 
         # TODO: Finish this.
@@ -71,9 +80,13 @@ class DeleteItem(webapp2.RequestHandler):
         # Retrieve the user associated with the Facebook token.
         try:
             user = user_utils.get_user_key_from_facebook_token(fb_access_token)
+        except user_utils.FacebookTokenExpiredException:
+            self.response.status_int = httplib.BAD_REQUEST
+            self.response.write(response_utils.make_fb_token_expired_response())
+            return
         except user_utils.FacebookException as e:
             self.response.write('Couldn\'t retrieve Facebook user ID. '
-                                'Error:\n{}'.format(e))
+                                'Error: {}'.format(e))
             return
 
         # Retrieve the item associated with the item id.
@@ -93,4 +106,4 @@ class DeleteItem(webapp2.RequestHandler):
         item_key.delete()
 
         self.response.write(
-            'Successfully deleted item with item_id={}'.format(item_id))
+            'Successfully deleted item: item_id={}'.format(item_id))
