@@ -23,6 +23,10 @@ routes = [
     Route(r'/delete_item',
           handler='handlers.DeleteItem', name='delete_item'),
 
+    # Liking and disliking of items.
+    Route(r'/update_liked_item_state', handler='handlers.UpdateLikedItemState',
+          name='update_liked_item_state'),
+
     # Administrative, for development.
     Route(r'/clear_all', handler='handlers.ClearAllEntry', name='clear_all')
 ]

@@ -11,6 +11,7 @@ FACEBOOK_TOKEN_ERROR = _ErrorCode('FacebookTokenError', 201)
 
 ACCOUNT_EXISTS = _ErrorCode('AccountExists', 300)
 INVALID_ITEM = _ErrorCode('InvalidItem', 301)
+INVALID_USER = _ErrorCode('InvalidUser', 302)
 USER_PERMISSION_ERROR = _ErrorCode('UserPermissionError', 303)
 
 GENERIC_ERROR = _ErrorCode('GenericError', 900)

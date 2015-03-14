@@ -50,28 +50,3 @@ def get_facebook_user_id(fb_access_token):
 
     # Wrap all other errors.
     raise FacebookException(response.content)
-
-
-def get_user_key_from_facebook_token(fb_access_token):
-    """Use a Facebook access token to retrieve a user key.
-
-    Args:
-      fb_access_token: The Facebook access token.
-    Raises:
-      FacebookTokenExpiredException: if the given token expired.
-      FacebookException: if there was any other problem getting the Facebook
-        user id using this token.
-    Returns:
-      A models.User key to the desired user.
-    """
-    # Use the token to get the Facebook user id.
-    fb_user_id = get_facebook_user_id(fb_access_token)
-
-    # Retrieve the User object for the given Facebook user id, if it exists.
-    query = models.User.query(models.User.third_party_id == fb_user_id)
-    query_iterator = query.iter()
-    if query_iterator.has_next():
-        return query_iterator.next()
-
-    # At this point, looks like there is no user with that id.
-    return None

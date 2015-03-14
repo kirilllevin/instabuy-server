@@ -1,77 +1,19 @@
-import json
-import httplib
-import webapp2
-
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
 
 import error_codes
+import instabuy_handler
 import user_utils
 import models
 
 
-class InstabuyHandler(webapp2.RequestHandler):
-
-    def populate_error_response(self, error_code, message=None):
-        self.response.status_int = httplib.BAD_REQUEST
-        error_response = json.dumps({'error': {'status': error_code.name,
-                                               'error_code': error_code.code,
-                                               'message': message}})
-        self.response.write(json.dumps(error_response))
-
-    def populate_success_response(self, response_dict={'success': True}):
-        self.response.status_int = httplib.OK
-        self.response.write(json.dumps(response_dict))
-
-    def get_item_for_mutation(self, fb_access_token, item_id):
-        """Get a models.Item that is allowed to be mutated.
-
-        This verifies that the item_id is valid and that the user
-        corresponding to the Facebook access token is the owner of that item.
-
-        In case of failure, this method populates an error response.
-
-        Args:
-          fb_access_token: The Facebook access token of the user that
-            (allegedly) owns this item.
-          item_id: The id of the item to retrieve.
-
-        Returns:
-          (True, item), where item is the models. Item corresponding to
-          item_id, if there were no problems, or (False, None) otherwise.
-        """
-        # Retrieve the user associated with the Facebook token.
-        try:
-            user = user_utils.get_user_key_from_facebook_token(fb_access_token)
-        except user_utils.FacebookTokenExpiredException:
-            self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
-            return False, None
-        except user_utils.FacebookException as e:
-            self.populate_error_response(error_codes.FACEBOOK_ERROR, e)
-            return False, None
-
-        # Retrieve the item associated with the item id.
-        item_key = ndb.Key(models.Item, item_id)
-        item = item_key.get()
-        if not item:
-            self.populate_error_response(error_codes.INVALID_ITEM)
-            return False, None
-
-        # Check that the user owns the item.
-        if item.user_id != user.key:
-            self.populate_error_response(error_codes.USER_PERMISSION_ERROR)
-            return False, None
-
-        return True, item
-
-
-class DefaultHandler(InstabuyHandler):
+class DefaultHandler(instabuy_handler.InstabuyHandler):
     def get(self):
         self.response.write('This is the default handler!')
 
 
-class Register(InstabuyHandler):
+class Register(instabuy_handler.InstabuyHandler):
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -99,23 +41,24 @@ class Register(InstabuyHandler):
         # Store a new user entry.
         user = models.User(login_type='facebook',
                            third_party_id=fb_user_id)
-        user_key = user.put()
+        user.put()
         self.populate_success_response()
 
 
-class ClearAllEntry(InstabuyHandler):
+class ClearAllEntry(instabuy_handler.InstabuyHandler):
     def get(self):
         ndb.delete_multi(models.User.query().fetch(keys_only=True))
         self.populate_success_response()
 
 
-class GetImageUploadUrl(InstabuyHandler):
+class GetImageUploadUrl(instabuy_handler.InstabuyHandler):
     def get(self):
         self.populate_success_response(
             {'upload_url': blobstore.create_upload_url('/upload_image')})
 
 
-class UploadImage(blobstore_handlers.BlobstoreUploadHandler, InstabuyHandler):
+class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
+                  instabuy_handler.InstabuyHandler):
     def post(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
@@ -131,19 +74,20 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler, InstabuyHandler):
             return
         image_key = uploads[0].key()
 
-        success, item = self.get_item_for_mutation(fb_access_token, item_id)
-        if not success:
+        if not (self.populate_user(fb_access_token) and
+                self.populate_item_for_mutation(item_id)):
             # Delete the blob.
             blobstore.delete(image_key)
+            return
 
         # Append the image key to the item's list of images.
-        item.image.append(image_key)
-        item.put()
+        self.item.image.append(image_key)
+        self.item.put()
 
         self.populate_success_response()
 
 
-class PostItem(InstabuyHandler):
+class PostItem(instabuy_handler.InstabuyHandler):
     def post(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
@@ -159,13 +103,7 @@ class PostItem(InstabuyHandler):
             return
 
         # Retrieve the user associated with the Facebook token.
-        try:
-            user = user_utils.get_user_key_from_facebook_token(fb_access_token)
-        except user_utils.FacebookTokenExpiredException:
-            self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
-            return
-        except user_utils.FacebookException as e:
-            self.populate_error_response(error_codes.FACEBOOK_ERROR, e)
+        if not self.populate_user(fb_access_token):
             return
 
         item = models.Item(user_id=user.key(),
@@ -178,19 +116,78 @@ class PostItem(InstabuyHandler):
         self.populate_success_response({'item_id': item_key.id()})
 
 
-class DeleteItem(InstabuyHandler):
+class DeleteItem(instabuy_handler.InstabuyHandler):
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
         item_id = self.request.get('item_id')
-        if not fb_access_token or not item_id:
+        if not (fb_access_token and item_id):
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
-        success, item = self.get_item_for_mutation(fb_access_token, item_id)
+        if not self.populate_user(fb_access_token):
+            return
 
-        if success:
-            # Delete the item.
-            item.key.delete()
+        if not self.populate_item_for_mutation(item_id):
+            return
 
-            self.populate_success_response()
+        # Delete all the likes/dislikes of this item by removing all the
+        # LikedItemState objects that are mentioning this item.
+        dislikes_query = models.LikedItemState.query(
+            models.LikedItemState.item_id == self.item.key)
+        ndb.delete_multi([d.key for d in dislikes_query.iter()])
+
+        # TODO: When chat is implemented, delete all the chat convos
+        # associated to this item as well.
+
+        # Delete all the images associated to this item.
+        for image_key in self.item.image:
+            blobstore.delete(image_key)
+
+        # Delete the item itself.
+        self.item.key.delete()
+
+        self.populate_success_response()
+
+
+class UpdateLikedItemState(instabuy_handler.InstabuyHandler):
+    def get(self):
+        # Verify that the required parameters were supplied.
+        fb_access_token = self.request.get('fb_access_token')
+        item_id = self.request.get('item_id')
+        like_state = self.request.get('like_state')
+        if not (fb_access_token and item_id and like_state):
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+        # Ensure that like_state is either 1 (like) or 0 (dislike).
+        try:
+            like_state = int(like_state)
+        except ValueError:
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+        if like_state != 0 and like_state != 1:
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+
+        # Retrieve the relevant user and item objects.
+        if not self.populate_user(fb_access_token):
+            return
+        if not self.populate_item(item_id):
+            return
+
+        # Check if we already recorded a like state for this user, item pair.
+        # If it exists, simply update it, otherwise store a new one.
+        query = models.LikedItemState.query(
+            models.LikedItemState.user_id == self.user.key and
+            models.LikedItemState.item_id == self.item.key)
+        query_iterator = query.iter()
+        if query_iterator.has_next():
+            liked_item_state = query_iterator.next()
+            liked_item_state.like_state = bool(like_state)
+            liked_item_state.put()
+        else:
+            liked_item_state = models.LikedItemState(
+                user_id=self.user.key, item_id=self.item.key,
+                like_state=bool(like_state))
+            liked_item_state.put()
+        self.populate_success_response()

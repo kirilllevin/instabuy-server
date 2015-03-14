@@ -9,9 +9,6 @@ class User(ndb.Model):
     # login_type value, these must be unique.
     third_party_id = ndb.StringProperty(indexed=True)
 
-    # User's current list of liked items. These are item_ids.
-    liked_item = ndb.KeyProperty('Item', repeated=True)
-
 
 class Item(ndb.Model):
     # The user ID that owns this item.
@@ -41,14 +38,13 @@ class Item(ndb.Model):
     # The user's lat/lng when this item was created.
     location = ndb.GeoPtProperty()
 
-    # Counters for how many people have liked and disliked this item.
-    num_likes = ndb.IntegerProperty(default=0)
-    num_dislikes = ndb.IntegerProperty(default=0)
 
-
-class DislikedItem(ndb.Model):
-    # The user that disliked the item.
+class LikedItemState(ndb.Model):
+    # The user that liked/disliked the item.
     user_id = ndb.KeyProperty(User, indexed=True)
 
-    # The item that was disliked by the user.
+    # The item that was liked/disliked by the user.
     item_id = ndb.KeyProperty(Item, indexed=True)
+
+    # Whether or not this is a like or dislike.
+    like_state = ndb.BooleanProperty()
