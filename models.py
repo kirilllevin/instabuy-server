@@ -27,7 +27,10 @@ class Item(ndb.Model):
     active = ndb.BooleanProperty(default=True)
 
     # The textual description supplied by the user.
-    text = ndb.TextProperty()
+    description = ndb.TextProperty()
+
+    # The price of the item. Formatted in the app.
+    price = ndb.TextProperty()
 
     # The categories that this item is part of.
     category = ndb.TextProperty(repeated=True)
@@ -39,8 +42,8 @@ class Item(ndb.Model):
     location = ndb.GeoPtProperty()
 
     # Counters for how many people have liked and disliked this item.
-    num_likes = ndb.IntegerProperty()
-    num_dislikes = ndb.IntegerProperty()
+    num_likes = ndb.IntegerProperty(default=0)
+    num_dislikes = ndb.IntegerProperty(default=0)
 
 
 class DislikedItem(ndb.Model):

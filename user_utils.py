@@ -1,7 +1,9 @@
 import httplib
 import json
-import models
+
 from google.appengine.api import urlfetch
+
+import models
 
 
 class FacebookException(Exception):
