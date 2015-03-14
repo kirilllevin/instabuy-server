@@ -38,7 +38,7 @@ class InstabuyHandler(webapp2.RequestHandler):
           item_id: The id of the item to retrieve.
 
         Returns:
-          (True, item), where item is the models.Item corresponding to
+          (True, item), where item is the models. Item corresponding to
           item_id, if there were no problems, or (False, None) otherwise.
         """
         # Retrieve the user associated with the Facebook token.
@@ -55,16 +55,12 @@ class InstabuyHandler(webapp2.RequestHandler):
         item_key = ndb.Key(models.Item, item_id)
         item = item_key.get()
         if not item:
-            self.populate_error_response(
-                error_codes.INVALID_ITEM, 'Invalid item id {}.'.format(item_id))
+            self.populate_error_response(error_codes.INVALID_ITEM)
             return False, None
 
         # Check that the user owns the item.
         if item.user_id != user.key:
-            self.populate_error_response(
-                error_codes.USER_PERMISSION_ERROR,
-                'User {} doesn\'t own the item {}.'.format(
-                    user.key.id(), item_id))
+            self.populate_error_response(error_codes.USER_PERMISSION_ERROR)
             return False, None
 
         return True, item
