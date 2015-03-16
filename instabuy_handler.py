@@ -1,6 +1,6 @@
-import json
 import httplib
 import webapp2
+from webapp2_extras import json
 
 from google.appengine.ext import ndb
 
@@ -9,25 +9,28 @@ import user_utils
 import models
 
 
-@ndb.toplevel
 class InstabuyHandler(webapp2.RequestHandler):
     def __init__(self, request, response):
         super(InstabuyHandler, self).__init__(request, response)
+        # All the responses are JSON.
+        self.response.content_type = 'application/json'
         self.user = None
         self.item = None
 
     def populate_error_response(self, error_code, message=None):
         self.response.status_int = httplib.BAD_REQUEST
-        error_response = json.dumps({'status': httplib.BAD_REQUEST,
-                                     'error': {'status': error_code.name,
-                                               'error_code': error_code.code,
-                                               'message': message}})
-        self.response.write(json.dumps(error_response))
+        error_dict = {'status': error_code.name,
+                      'error_code': error_code.code}
+        if message:
+            error_dict['message'] = message
+        self.response.write(json.encode({'status': httplib.BAD_REQUEST,
+                                         'error': error_dict}))
 
     def populate_success_response(self, response_dict={}):
         self.response.status_int = httplib.OK
-        full_dict = {'status': httplib.OK} + response_dict
-        self.response.write(json.dumps(full_dict))
+        full_dict = {'status': httplib.OK}
+        full_dict.update(response_dict)
+        self.response.write(json.encode(full_dict))
 
     def populate_user(self, fb_access_token):
         """Load a models.User corresponding to a Facebook access token.

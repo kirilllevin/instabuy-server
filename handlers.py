@@ -1,19 +1,14 @@
-import json
-
 from google.appengine.api import images
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
+from webapp2_extras import json
 
+import constants
 import error_codes
 import instabuy_handler
 import user_utils
 import models
-
-
-_NUM_ITEMS_PER_REQUEST = 5
-_NUM_ITEMS_PER_PAGE = 50
-_NUM_USERS_PER_PAGE = 300
 
 
 class DefaultHandler(instabuy_handler.InstabuyHandler):
@@ -22,6 +17,7 @@ class DefaultHandler(instabuy_handler.InstabuyHandler):
 
 
 class Register(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -53,6 +49,7 @@ class Register(instabuy_handler.InstabuyHandler):
 
 
 class ClearAllEntry(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         ndb.delete_multi(models.User.query().fetch(keys_only=True))
         ndb.delete_multi(models.LikeState.query().fetch(keys_only=True))
@@ -62,6 +59,7 @@ class ClearAllEntry(instabuy_handler.InstabuyHandler):
 
 
 class GetImageUploadUrl(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         self.populate_success_response(
             {'upload_url': blobstore.create_upload_url('/upload_image')})
@@ -69,6 +67,7 @@ class GetImageUploadUrl(instabuy_handler.InstabuyHandler):
 
 class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
                   instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def post(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
@@ -101,6 +100,7 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
 
 
 class PostItem(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def post(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
@@ -130,6 +130,7 @@ class PostItem(instabuy_handler.InstabuyHandler):
 
 
 class DeleteItem(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -146,17 +147,19 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
 
         # Delete all the likes/dislikes of this item by removing all the
         # LikedItemState objects that are mentioning this item.
-        dislikes_query = models.LikeState.query(item_id == self.item.key,
-                                                keys_only=True)
+        dislikes_query = models.LikeState.query(
+            models.LikeState.item_id == self.item.key,
+            keys_only=True)
         ndb.delete_multi_async(dislikes_query)
 
         # Delete this item's id from all the seen_items lists of all users.
-        users_query = models.User.query(seen_items == self.item.key.id())
+        users_query = models.User.query(
+            models.User.seen_items == self.item.key.id())
         cursor = None
         more = True
         while more:
             users, cursor, more = users_query.fetch_page(
-                _NUM_USERS_PER_PAGE, start_cusor=cursor)
+                constants.NUM_USERS_PER_PAGE, start_cusor=cursor)
             for user in users:
                 # Delete the unique occurrence of the item's id in the
                 # seen_items list.
@@ -177,6 +180,7 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
 
 
 class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -203,7 +207,8 @@ class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
 
         # Check if we already recorded a like state for this user, item pair.
         # If it exists, simply update it, otherwise store a new one.
-        query = models.LikeState.query(item_id == self.item.key)
+        query = models.LikeState.query(
+            models.LikeState.item_id == self.item.key)
         item_like_state = query.filter(
             models.LikeState.user_id == self.user.key).get()
         if item_like_state:
@@ -221,6 +226,7 @@ class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
 
 
 class GetItems(instabuy_handler.InstabuyHandler):
+    @ndb.toplevel
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -248,9 +254,9 @@ class GetItems(instabuy_handler.InstabuyHandler):
             query = models.Item.query(models.Item.category == category)
             cursor = None
             more = True
-            while len(results) < _NUM_ITEMS_PER_REQUEST and more:
-                items, cursor, more = query.fetch_page(_NUM_ITEMS_PER_PAGE,
-                                                       start_cusor=cursor)
+            while len(results) < constants.NUM_ITEMS_PER_REQUEST and more:
+                items, cursor, more = query.fetch_page(
+                    constants.NUM_ITEMS_PER_PAGE, start_cusor=cursor)
                 for item in items:
                     if item.key.id not in seen_items:
                         results.append(item)
@@ -258,7 +264,7 @@ class GetItems(instabuy_handler.InstabuyHandler):
                         break
 
             self.populate_success_response(
-                {'results': json.dumps([r.to_dict() for r in results])})
+                {'results': json.encode([r.to_dict() for r in results])})
 
         else:
             self.populate_error_response(error_codes.GENERIC_ERROR,

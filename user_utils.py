@@ -3,8 +3,6 @@ import json
 
 from google.appengine.api import urlfetch
 
-import models
-
 
 class FacebookException(Exception):
     """An exception in communicating with Facebook."""
