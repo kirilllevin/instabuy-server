@@ -9,6 +9,7 @@ import user_utils
 import models
 
 
+@ndb.toplevel
 class InstabuyHandler(webapp2.RequestHandler):
     def __init__(self, request, response):
         super(InstabuyHandler, self).__init__(request, response)
@@ -17,14 +18,16 @@ class InstabuyHandler(webapp2.RequestHandler):
 
     def populate_error_response(self, error_code, message=None):
         self.response.status_int = httplib.BAD_REQUEST
-        error_response = json.dumps({'error': {'status': error_code.name,
+        error_response = json.dumps({'status': httplib.BAD_REQUEST,
+                                     'error': {'status': error_code.name,
                                                'error_code': error_code.code,
                                                'message': message}})
         self.response.write(json.dumps(error_response))
 
-    def populate_success_response(self, response_dict={'success': True}):
+    def populate_success_response(self, response_dict={}):
         self.response.status_int = httplib.OK
-        self.response.write(json.dumps(response_dict))
+        full_dict = {'status': httplib.OK} + response_dict
+        self.response.write(json.dumps(full_dict))
 
     def populate_user(self, fb_access_token):
         """Load a models.User corresponding to a Facebook access token.
@@ -52,11 +55,8 @@ class InstabuyHandler(webapp2.RequestHandler):
             return False
 
         # Retrieve the User object for the given Facebook user id, if it exists.
-        query = models.User.query(models.User.third_party_id == fb_user_id)
-        query_iterator = query.iter()
-        if query_iterator.has_next():
-            self.user = query_iterator.next()
-
+        self.user = models.User.query(
+            models.User.third_party_id == fb_user_id).get()
         if not self.user:
             # At this point, looks like there is no user with that id.
             self.populate_error_response(error_codes.INVALID_USER)

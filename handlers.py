@@ -1,3 +1,6 @@
+import json
+
+from google.appengine.api import images
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
@@ -6,6 +9,11 @@ import error_codes
 import instabuy_handler
 import user_utils
 import models
+
+
+_NUM_ITEMS_PER_REQUEST = 5
+_NUM_ITEMS_PER_PAGE = 50
+_NUM_USERS_PER_PAGE = 300
 
 
 class DefaultHandler(instabuy_handler.InstabuyHandler):
@@ -32,9 +40,8 @@ class Register(instabuy_handler.InstabuyHandler):
             return
 
         # Check if the user is already registered.
-        query = models.User.query(models.User.third_party_id == fb_user_id)
-        query_iterator = query.iter()
-        if query_iterator.has_next():
+        user = models.User.query(models.User.third_party_id == fb_user_id).get()
+        if user:
             self.populate_error_response(error_codes.ACCOUNT_EXISTS)
             return
 
@@ -48,6 +55,9 @@ class Register(instabuy_handler.InstabuyHandler):
 class ClearAllEntry(instabuy_handler.InstabuyHandler):
     def get(self):
         ndb.delete_multi(models.User.query().fetch(keys_only=True))
+        ndb.delete_multi(models.LikeState.query().fetch(keys_only=True))
+        ndb.delete_multi(models.Item.query().fetch(keys_only=True))
+        ndb.delete_multi(models.Image().query().fetch(keys_only=True))
         self.populate_success_response()
 
 
@@ -81,7 +91,10 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
             return
 
         # Append the image key to the item's list of images.
-        self.item.image.append(image_key)
+        image = models.Image(data=image_key,
+                             path=images.get_serving_url(image_key))
+
+        self.item.image.append(image)
         self.item.put()
 
         self.populate_success_response()
@@ -106,7 +119,7 @@ class PostItem(instabuy_handler.InstabuyHandler):
         if not self.populate_user(fb_access_token):
             return
 
-        item = models.Item(user_id=user.key(),
+        item = models.Item(user_id=self.user.key(),
                            description=description,
                            price=price,
                            category=category,
@@ -133,24 +146,37 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
 
         # Delete all the likes/dislikes of this item by removing all the
         # LikedItemState objects that are mentioning this item.
-        dislikes_query = models.LikedItemState.query(
-            models.LikedItemState.item_id == self.item.key)
-        ndb.delete_multi([d.key for d in dislikes_query.iter()])
+        dislikes_query = models.LikeState.query(item_id == self.item.key,
+                                                keys_only=True)
+        ndb.delete_multi_async(dislikes_query)
 
-        # TODO: When chat is implemented, delete all the chat convos
+        # Delete this item's id from all the seen_items lists of all users.
+        users_query = models.User.query(seen_items == self.item.key.id())
+        cursor = None
+        more = True
+        while more:
+            users, cursor, more = users_query.fetch_page(
+                _NUM_USERS_PER_PAGE, start_cusor=cursor)
+            for user in users:
+                # Delete the unique occurrence of the item's id in the
+                # seen_items list.
+                del user.seen_items[user.seen_items.index(self.item.key.id())]
+            ndb.put_multi_async(users)
+
+        # TODO: When chat is implemented, delete all the chat conversations
         # associated to this item as well.
 
-        # Delete all the images associated to this item.
-        for image_key in self.item.image:
-            blobstore.delete(image_key)
+        # Delete all the image data associated to this item.
+        for image in self.item.image:
+            images.delete_serving_url_async(image.data)
+        blobstore.delete_async([image.data for image in self.item.image])
 
         # Delete the item itself.
-        self.item.key.delete()
-
+        self.item.key.delete_async()
         self.populate_success_response()
 
 
-class UpdateLikedItemState(instabuy_handler.InstabuyHandler):
+class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
     def get(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
@@ -177,17 +203,63 @@ class UpdateLikedItemState(instabuy_handler.InstabuyHandler):
 
         # Check if we already recorded a like state for this user, item pair.
         # If it exists, simply update it, otherwise store a new one.
-        query = models.LikedItemState.query(
-            models.LikedItemState.user_id == self.user.key and
-            models.LikedItemState.item_id == self.item.key)
-        query_iterator = query.iter()
-        if query_iterator.has_next():
-            liked_item_state = query_iterator.next()
-            liked_item_state.like_state = bool(like_state)
-            liked_item_state.put()
+        query = models.LikeState.query(item_id == self.item.key)
+        item_like_state = query.filter(
+            models.LikeState.user_id == self.user.key).get()
+        if item_like_state:
+            item_like_state.like_state = bool(like_state)
         else:
-            liked_item_state = models.LikedItemState(
-                user_id=self.user.key, item_id=self.item.key,
+            item_like_state = models.LikeState(
+                parent=self.item.key,
+                user_id=self.user.key,
                 like_state=bool(like_state))
-            liked_item_state.put()
+            # Mark that the user has now seen this item.
+            self.user.seen_items.append(self.item.key.id())
+            self.user.put_async()
+        item_like_state.put_async()
         self.populate_success_response()
+
+
+class GetItems(instabuy_handler.InstabuyHandler):
+    def get(self):
+        # Verify that the required parameters were supplied.
+        fb_access_token = self.request.get('fb_access_token')
+        request_type = self.request.get('request_type')
+        category = self.request.get('category')
+
+        if not (fb_access_token and request_type):
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+
+        # If the request type is 'category', category must not be empty.
+        if request_type == 'category' and not category:
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+
+        # Populate a set containing the ids of all the items that the user has
+        # already seen. These need to be skipped.
+        seen_items = set(self.user.seen_items)
+
+        if request_type == 'category':
+            # This will store the results
+            results = []
+
+            # All items that contain the desired category.
+            query = models.Item.query(models.Item.category == category)
+            cursor = None
+            more = True
+            while len(results) < _NUM_ITEMS_PER_REQUEST and more:
+                items, cursor, more = query.fetch_page(_NUM_ITEMS_PER_PAGE,
+                                                       start_cusor=cursor)
+                for item in items:
+                    if item.key.id not in seen_items:
+                        results.append(item)
+                    if len(results) == _NUM_ITEMS_PER_REQUEST:
+                        break
+
+            self.populate_success_response(
+                {'results': json.dumps([r.to_dict() for r in results])})
+
+        else:
+            self.populate_error_response(error_codes.GENERIC_ERROR,
+                                         'Unimplemented')
