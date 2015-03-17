@@ -14,8 +14,8 @@ class User(ndb.Model):
 
 
 class Image(ndb.Model):
-    # The actual image data.
-    data = ndb.BlobKeyProperty(indexed=False)
+    # The key for the actual image data in Blobstore.
+    blob_key = ndb.BlobKeyProperty(indexed=False)
 
     # The path to the data, from calling get_serving_url().
     path = ndb.TextProperty()

@@ -90,7 +90,7 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
             return
 
         # Append the image key to the item's list of images.
-        image = models.Image(data=image_key,
+        image = models.Image(blob_key=image_key,
                              path=images.get_serving_url(image_key))
 
         self.item.image.append(image)
@@ -148,9 +148,8 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
         # Delete all the likes/dislikes of this item by removing all the
         # LikedItemState objects that are mentioning this item.
         dislikes_query = models.LikeState.query(
-            models.LikeState.item_id == self.item.key,
-            keys_only=True)
-        ndb.delete_multi_async(dislikes_query)
+            models.LikeState.item_id == self.item.key)
+        ndb.delete_multi_async(dislikes_query.fetch(keys_only=True))
 
         # Delete this item's id from all the seen_items lists of all users.
         users_query = models.User.query(
@@ -170,12 +169,16 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
         # associated to this item as well.
 
         # Delete all the image data associated to this item.
+        future = blobstore.delete_async(
+            [image.blob_key for image in self.item.image])
         for image in self.item.image:
-            images.delete_serving_url_async(image.data)
-        blobstore.delete_async([image.data for image in self.item.image])
+            images.delete_serving_url(image.blob_key)
 
         # Delete the item itself.
         self.item.key.delete_async()
+
+        # We actually have to wait on the Blobstore future, unlike the others.
+        future.wait()
         self.populate_success_response()
 
 
@@ -260,7 +263,7 @@ class GetItems(instabuy_handler.InstabuyHandler):
                 for item in items:
                     if item.key.id not in seen_items:
                         results.append(item)
-                    if len(results) == _NUM_ITEMS_PER_REQUEST:
+                    if len(results) == constants.NUM_ITEMS_PER_REQUEST:
                         break
 
             self.populate_success_response(

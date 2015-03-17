@@ -82,7 +82,7 @@ class InstabuyHandler(webapp2.RequestHandler):
         Returns:
           True if the populate succeeded, False otherwise.
         """
-        item_key = ndb.Key(models.Item, item_id)
+        item_key = ndb.Key(models.Item, long(item_id))
         self.item = item_key.get()
         if not self.item:
             self.populate_error_response(error_codes.INVALID_ITEM)
