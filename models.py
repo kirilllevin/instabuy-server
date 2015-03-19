@@ -12,13 +12,17 @@ class User(ndb.Model):
     # All the currently-live items that the user has seen.
     seen_items = ndb.IntegerProperty(repeated=True)
 
+    # The user's preference for the distance radius when searching for nearby
+    # items.
+    distance_radius_km = ndb.IntegerProperty(default=10, indexed=False)
+
 
 class Image(ndb.Model):
     # The key for the actual image data in Blobstore.
     blob_key = ndb.BlobKeyProperty(indexed=False)
 
     # The path to the data, from calling get_serving_url().
-    path = ndb.TextProperty()
+    url = ndb.TextProperty()
 
 
 class Item(ndb.Model):
@@ -31,23 +35,8 @@ class Item(ndb.Model):
     # The time/date that this item was last modified.
     modify_date = ndb.DateTimeProperty(auto_now=True, indexed=False)
 
-    # The title of the item.
-    title = ndb.TextProperty()
-
-    # The textual description supplied by the user.
-    description = ndb.TextProperty()
-
-    # The price of the item. Formatted in the app.
-    price = ndb.TextProperty()
-
-    # The category that this item is part of.
-    category = ndb.StringProperty()
-
     # The list of images associated to this item. Limited to 5 in the app.
     image = ndb.StructuredProperty(Image, repeated=True, indexed=False)
-
-    # The user's lat/lng when this item was created.
-    location = ndb.GeoPtProperty(indexed=False)
 
 
 class LikeState(ndb.Model):

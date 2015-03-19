@@ -2,8 +2,6 @@ import httplib
 import webapp2
 from webapp2_extras import json
 
-from google.appengine.ext import ndb
-
 import error_codes
 import user_utils
 import models
@@ -82,8 +80,7 @@ class InstabuyHandler(webapp2.RequestHandler):
         Returns:
           True if the populate succeeded, False otherwise.
         """
-        item_key = ndb.Key(models.Item, long(item_id))
-        self.item = item_key.get()
+        self.item = models.Item.get_by_id(item_id)
         if not self.item:
             self.populate_error_response(error_codes.INVALID_ITEM)
             return False

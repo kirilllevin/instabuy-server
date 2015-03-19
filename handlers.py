@@ -1,4 +1,7 @@
+import logging
+
 from google.appengine.api import images
+from google.appengine.api import search
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
@@ -72,7 +75,18 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
         item_id = self.request.POST['item_id']
-        if not (fb_access_token and item_id):
+
+        # Verify that the request is formed correctly.
+        malformed_request = False
+        try:
+            if not (fb_access_token and item_id):
+                malformed_request = True
+            else:
+                item_id = long(item_id)
+        except ValueError:
+            malformed_request = False
+
+        if malformed_request:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
@@ -91,7 +105,7 @@ class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
 
         # Append the image key to the item's list of images.
         image = models.Image(blob_key=image_key,
-                             path=images.get_serving_url(image_key))
+                             url=images.get_serving_url(image_key))
 
         self.item.image.append(image)
         self.item.put()
@@ -104,14 +118,26 @@ class PostItem(instabuy_handler.InstabuyHandler):
     def post(self):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.POST['fb_access_token']
+        title = self.request.POST['title']
         description = self.request.POST['description']
         price = self.request.POST['price']
+        currency = self.request.POST['currency']
         category = self.request.POST.getall('category')
         lat = self.request.POST['lat']
         lng = self.request.POST['lng']
 
-        if not (fb_access_token and description and price and category and
-                lat and lng):
+        malformed_request = False
+        try:
+            if not (fb_access_token and title and description and price and
+                    currency and category and lat and lng):
+                malformed_request = True
+            else:
+                lat = float(lat)
+                lng = float(lng)
+        except ValueError:
+            malformed_request = True
+
+        if malformed_request:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
@@ -119,12 +145,32 @@ class PostItem(instabuy_handler.InstabuyHandler):
         if not self.populate_user(fb_access_token):
             return
 
-        item = models.Item(user_id=self.user.key(),
-                           description=description,
-                           price=price,
-                           category=category,
-                           location=ndb.GeoPt(lat, lng))
+        item = models.Item(user_id=self.user.key())
         item_key = item.put()
+
+        fields = [
+            # Include the user ID so we can skip items owned by a user in
+            # queries.
+            search.AtomField(name='user_id', value=self.user.key()),
+            search.AtomField(name='category', value=category),
+            search.TextField(name='title', value=title),
+            search.TextField(name='description', value=description),
+            search.TextField(name='price', value=price),
+            search.TextField(name='currency', value=currency),
+            search.GeoField(name='location', value=search.GeoPoint(lat, lng))]
+
+        # The Item object's id is shared with the document.
+        item_doc = search.Document(
+            doc_id=str(item_key.id()),
+            fields=fields)
+        try:
+            index = search.Index(name=constants.ITEM_INDEX_NAME)
+            index.put(item_doc)
+        except search.Error:
+            # Delete the stored item.
+            item_key.delete()
+            self.populate_error_response(error_codes.INDEXING_ERROR)
+            return
 
         self.populate_success_response({'item_id': item_key.id()})
 
@@ -135,13 +181,21 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
         item_id = self.request.get('item_id')
-        if not (fb_access_token and item_id):
+        malformed_request = False
+        try:
+            if not (fb_access_token and item_id):
+                malformed_request = True
+            else:
+                item_id = long(item_id)
+        except ValueError:
+            malformed_request = True
+
+        if malformed_request:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
         if not self.populate_user(fb_access_token):
             return
-
         if not self.populate_item_for_mutation(item_id):
             return
 
@@ -169,16 +223,27 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
         # associated to this item as well.
 
         # Delete all the image data associated to this item.
-        future = blobstore.delete_async(
+        blobstore_future = blobstore.delete_async(
             [image.blob_key for image in self.item.image])
         for image in self.item.image:
             images.delete_serving_url(image.blob_key)
 
+        # Delete the search document associated with this item.
+        try:
+            index = search.Index(name=constants.ITEM_INDEX_NAME)
+            index_future = index.delete_async(str(self.item.key.id()))
+        except search.Error as e:
+            logging.error(
+                'Index delete failed for item_id={}. Message: {}'.format(
+                    self.item.key.id(), e.message))
+
         # Delete the item itself.
         self.item.key.delete_async()
 
-        # We actually have to wait on the Blobstore future, unlike the others.
-        future.wait()
+        # We actually have to wait on the Blobstore and Index futures, unlike
+        # the others.
+        index_future.get_result()
+        blobstore_future.wait()
         self.populate_success_response()
 
 
@@ -189,16 +254,20 @@ class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
         fb_access_token = self.request.get('fb_access_token')
         item_id = self.request.get('item_id')
         like_state = self.request.get('like_state')
-        if not (fb_access_token and item_id and like_state):
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-        # Ensure that like_state is either 1 (like) or 0 (dislike).
+
+        malformed_request = False
         try:
-            like_state = int(like_state)
+            if not (fb_access_token and item_id and like_state):
+                malformed_request = True
+            else:
+                like_state = int(like_state)
+                item_id = long(item_id)
+                # Ensure that like_state is either 1 (like) or 0 (dislike).
+                if like_state != 0 and like_state != 1:
+                    malformed_request = True
         except ValueError:
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-        if like_state != 0 and like_state != 1:
+            malformed_request = True
+        if malformed_request:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
@@ -234,41 +303,106 @@ class GetItems(instabuy_handler.InstabuyHandler):
         # Verify that the required parameters were supplied.
         fb_access_token = self.request.get('fb_access_token')
         request_type = self.request.get('request_type')
+        cursor = search.Cursor(web_safe_string=self.request.get('cursor'))
         category = self.request.get('category')
+        user_query = self.request.get('query')
+        lat = self.request.get('lat')
+        lng = self.request.get('lng')
 
-        if not (fb_access_token and request_type):
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
+        malformed_request = False
+        try:
+            if not (fb_access_token and request_type):
+                malformed_request = True
+            else:
+                # Validate that the request contained all the necessary data for
+                # the given request type.
+                if request_type == constants.RETRIEVAL_CATEGORY:
+                    # Category must be provided.
+                    malformed_request = not category
+                elif request_type == constants.RETRIEVAL_NEARBY:
+                    # Lat/lng must be provided.
+                    malformed_request = not (lat and lng)
+                    lat = float(lat)
+                    lng = float(lng)
+                elif request_type == constants.RETRIEVAL_SEARCH:
+                    # Search query must be provided.
+                    malformed_request = not user_query
+        except ValueError:
+            malformed_request = True
 
-        # If the request type is 'category', category must not be empty.
-        if request_type == 'category' and not category:
+        if malformed_request:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
         # Populate a set containing the ids of all the items that the user has
-        # already seen. These need to be skipped.
+        # already seen. These will need to be skipped.
         seen_items = set(self.user.seen_items)
 
-        if request_type == 'category':
-            # This will store the results
-            results = []
+        # This will store dict representations
+        returned_results = []
 
-            # All items that contain the desired category.
-            query = models.Item.query(models.Item.category == category)
-            cursor = None
-            more = True
-            while len(results) < constants.NUM_ITEMS_PER_REQUEST and more:
-                items, cursor, more = query.fetch_page(
-                    constants.NUM_ITEMS_PER_PAGE, start_cusor=cursor)
-                for item in items:
-                    if item.key.id not in seen_items:
-                        results.append(item)
-                    if len(results) == constants.NUM_ITEMS_PER_REQUEST:
-                        break
-
-            self.populate_success_response(
-                {'results': json.encode([r.to_dict() for r in results])})
-
+        # Figure out which query to use based on the request type.
+        if request_type == constants.RETRIEVAL_CATEGORY:
+            query = 'category={}'.format(category)
+        elif request_type == constants.RETRIEVAL_NEARBY:
+            # This query is already complex because of the distance search,
+            # so may as well filter out the user here.
+            query = ('distance(location, geopoint({}, {})) < {} AND '
+                     'NOT user_id={}').format(
+                lat, lng, self.user.distance_radius_km, self.user.key.id())
+        elif request_type == constants.RETRIEVAL_SEARCH:
+            # TODO: Revisit this, it looks totally insecure.
+            # TODO: Add stemming.
+            query = user_query
         else:
             self.populate_error_response(error_codes.GENERIC_ERROR,
                                          'Unimplemented')
+
+        begin_search = True
+        item_index = search.Index(constants.ITEM_INDEX_NAME)
+        try:
+            while (len(returned_results) < constants.NUM_ITEMS_PER_REQUEST and
+                   (begin_search or cursor is not None)):
+                begin_search = False
+                search_response = item_index.search(
+                    search.Query(query,
+                                 options=search.QueryOptions(
+                                     limit=constants.NUM_ITEMS_PER_PAGE,
+                                     cursor=cursor)))
+                cursor = search_response.cursor
+                for document in search_response.results:
+                    # Skip items that the user has seen already.
+                    if int(document.doc_id) in seen_items:
+                        continue
+                    # Skip items owned by the user.
+                    if document.field('user_id') == str(self.user.key.id()):
+                        continue
+                    # Create a JSON representation of the item to be returned.
+                    item = models.Item.get_by_id(document.doc_id)
+
+                    # TODO: Figure out how to convert DateTimeProperty.
+                    item_dict = {
+                        'item_id': document.doc_id,
+                        'date_time_added': '',
+                        'date_time_modified': '',
+                        'title': document.field('title'),
+                        'category': document.field('category'),
+                        'description': document.field('description'),
+                        'price': document.field('price'),
+                        'currency': document.field('currency'),
+                        'image': [i.url for i in item.image],
+                    }
+                    returned_results.append(item_dict)
+                    if len(returned_results) == constants.NUM_ITEMS_PER_REQUEST:
+                        break
+
+        except search.Error as e:
+            logging.error(
+                'Item search failed for query="{}". Message: {}'.format(
+                    query, e.message))
+            self.populate_error_response(error_codes.SEARCH_ERROR, request_type)
+            return
+
+        self.populate_success_response(
+            {'results': json.encode(returned_results),
+             'cursor': cursor.web_safe_string()})

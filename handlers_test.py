@@ -57,6 +57,7 @@ class DeleteItemTest(unittest.TestCase):
     nosegae_datastore_v3 = True
     nosegae_file = True
     nosegae_images = True
+    nosegae_search = True
 
     def setUp(self):
         self.user = models.User(login_type='facebook', third_party_id='1')
@@ -90,13 +91,15 @@ class DeleteItemTest(unittest.TestCase):
                          response_body['error']['error_code'])
 
     def test_successful_delete(self):
+        # TODO: Update test to include search document.
+
         # Set up the item we're going to delete.
         file_name = files.blobstore.create(mime_type='application/octet-stream')
         with files.open(file_name, 'a') as f:
             f.write('fake_image_data')
         files.finalize(file_name)
         blob_key = files.blobstore.get_blob_key(file_name)
-        image = models.Image(blob_key=blob_key, path='/fake')
+        image = models.Image(blob_key=blob_key, url='/fake')
 
         item = models.Item(user_id=ndb.Key(models.User, self.user_key.id()),
                            image=[image])

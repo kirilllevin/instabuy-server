@@ -16,3 +16,5 @@ USER_PERMISSION_ERROR = _ErrorCode('UserPermissionError', 303)
 
 GENERIC_ERROR = _ErrorCode('GenericError', 900)
 UPLOAD_FAILED = _ErrorCode('UploadFailed', 901)
+INDEXING_ERROR = _ErrorCode('IndexingError', 902)
+SEARCH_ERROR = _ErrorCode('SearchError', 903)
