@@ -50,7 +50,7 @@ class Post(base.BaseHandler):
         fields = [
             # Include the user ID so we can skip items owned by a user in
             # queries.
-            search.AtomField(name='user_id', value=self.user.key()),
+            search.AtomField(name='user_id', value=str(self.user.key.id())),
             search.AtomField(name='category', value=category),
             search.TextField(name='title', value=title),
             search.TextField(name='description', value=description),

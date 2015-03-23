@@ -1,4 +1,5 @@
 from google.appengine.api import files
+from google.appengine.api import search
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 import httplib
@@ -6,6 +7,7 @@ import unittest
 from webapp2_extras import json
 import webtest
 
+import constants
 import error_codes
 import main
 import models
@@ -14,7 +16,7 @@ import user_utils
 app = webtest.TestApp(main.app)
 
 
-class DeleteItemTest(unittest.TestCase):
+class DeleteTest(unittest.TestCase):
     # Enable the relevant stubs.
     nosegae_blobstore = True
     nosegae_datastore_v3 = True
@@ -31,6 +33,7 @@ class DeleteItemTest(unittest.TestCase):
 
         self.user = models.User(login_type='facebook', third_party_id='1')
         self.user_key = self.user.put()
+        self.item_index = search.Index(name=constants.ITEM_INDEX_NAME)
 
     def tearDown(self):
         user_utils.get_facebook_user_id = self.original_get_facebook_user_id
@@ -63,19 +66,31 @@ class DeleteItemTest(unittest.TestCase):
                          response_body['error']['error_code'])
 
     def test_successful_delete(self):
-        # TODO: Update test to include search document.
-
         # Set up the item we're going to delete.
         file_name = files.blobstore.create(mime_type='application/octet-stream')
         with files.open(file_name, 'a') as f:
             f.write('fake_image_data')
         files.finalize(file_name)
         blob_key = files.blobstore.get_blob_key(file_name)
+        self.assertIsNotNone(blobstore.get(blob_key))
+
         image = models.Image(blob_key=blob_key, url='/fake')
 
         item = models.Item(user_id=ndb.Key(models.User, self.user_key.id()),
                            image=[image])
         item_key = item.put()
+        self.assertIsNotNone(item_key.get())
+
+        # Set up the search documented associated to this item.
+        fields = [
+            search.AtomField(name='user_id', value=str(self.user_key.id())),
+            search.TextField(name='title', value='fake_title'),
+            search.TextField(name='description', value='fake_description')]
+        item_doc = search.Document(
+            doc_id=str(item_key.id()),
+            fields=fields)
+        self.item_index.put(item_doc)
+        self.assertIsNotNone(self.item_index.get(str(item_key.id())))
 
         # Set up a second user that has seen this item.
         other_user = models.User(login_type='facebook',
@@ -86,6 +101,7 @@ class DeleteItemTest(unittest.TestCase):
                                       item_id=item_key,
                                       like_state=False)
         like_state_key = like_state.put()
+        self.assertIsNotNone(like_state_key.get())
 
         # Delete the item.
         response = app.post('/delete_item',
@@ -99,6 +115,9 @@ class DeleteItemTest(unittest.TestCase):
         # local copy.
         other_user = other_user_key.get()
         self.assertListEqual([], other_user.seen_items)
+
+        # Check that the associated search document was deleted.
+        self.assertIsNone(self.item_index.get(str(item_key.id())))
 
         # Check that the associated image was deleted from the blobstore.
         self.assertIsNone(blobstore.get(blob_key))
