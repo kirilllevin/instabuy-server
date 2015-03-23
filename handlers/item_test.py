@@ -14,43 +14,6 @@ import user_utils
 app = webtest.TestApp(main.app)
 
 
-def mock_get_facebook_user_id(fb_access_token):
-    return str(fb_access_token)
-
-user_utils.get_facebook_user_id = mock_get_facebook_user_id
-
-
-class RegisterTest(unittest.TestCase):
-    # enable the datastore stub
-    nosegae_datastore_v3 = True
-
-    def test_new_user(self):
-        # At first, there should be no account.
-        user = models.User.query(models.User.third_party_id == '1').get()
-        self.assertIsNone(user)
-
-        # Now register.
-        response = app.get('/register', params={'fb_access_token': 1})
-        self.assertEqual(httplib.OK, response.status_int)
-
-        # Now check that a User object was indeed created.
-        user = models.User.query(models.User.third_party_id == '1').get()
-        self.assertIsNotNone(user)
-
-    def test_register_twice_is_error(self):
-        # Registering once works.
-        response = app.get('/register', params={'fb_access_token': 1})
-        self.assertEqual(httplib.OK, response.status_int)
-
-        # Registering a second time should give errors.
-        response = app.get('/register', params={'fb_access_token': 1},
-                           expect_errors=True)
-        self.assertEqual(httplib.BAD_REQUEST, response.status_int)
-        response_body = json.decode(response.body)
-        self.assertEqual(error_codes.ACCOUNT_EXISTS.code,
-                         response_body['error']['error_code'])
-
-
 class DeleteItemTest(unittest.TestCase):
     # Enable the relevant stubs.
     nosegae_blobstore = True
@@ -60,18 +23,27 @@ class DeleteItemTest(unittest.TestCase):
     nosegae_search = True
 
     def setUp(self):
+        self.original_get_facebook_user_id = user_utils.get_facebook_user_id
+
+        def mock_get_facebook_user_id(fb_access_token):
+            return str(fb_access_token)
+        user_utils.get_facebook_user_id = mock_get_facebook_user_id
+
         self.user = models.User(login_type='facebook', third_party_id='1')
         self.user_key = self.user.put()
+
+    def tearDown(self):
+        user_utils.get_facebook_user_id = self.original_get_facebook_user_id
 
     def test_delete_invalid_item(self):
         # Ensure that there is no item with id=7.
         self.assertIsNone(ndb.Key(models.Item, 7).get())
 
         # Now try to delete it.
-        response = app.get('/delete_item',
-                           params={'fb_access_token': 1,
-                                   'item_id': 7},
-                           expect_errors=True)
+        response = app.post('/delete_item',
+                            params={'fb_access_token': 1,
+                                    'item_id': 7},
+                            expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
         self.assertEqual(error_codes.INVALID_ITEM.code,
@@ -81,10 +53,10 @@ class DeleteItemTest(unittest.TestCase):
         # Set up an item that is owned by a different user.
         item = models.Item(user_id=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
-        response = app.get('/delete_item',
-                           params={'fb_access_token': 1,
-                                   'item_id': item_key.id()},
-                           expect_errors=True)
+        response = app.post('/delete_item',
+                            params={'fb_access_token': 1,
+                                    'item_id': item_key.id()},
+                            expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
         self.assertEqual(error_codes.USER_PERMISSION_ERROR.code,
@@ -116,9 +88,9 @@ class DeleteItemTest(unittest.TestCase):
         like_state_key = like_state.put()
 
         # Delete the item.
-        response = app.get('/delete_item',
-                           params={'fb_access_token': 1,
-                                   'item_id': item_key.id()})
+        response = app.post('/delete_item',
+                            params={'fb_access_token': 1,
+                                    'item_id': item_key.id()})
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_items list no longer has this

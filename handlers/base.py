@@ -7,9 +7,9 @@ import user_utils
 import models
 
 
-class InstabuyHandler(webapp2.RequestHandler):
+class BaseHandler(webapp2.RequestHandler):
     def __init__(self, request, response):
-        super(InstabuyHandler, self).__init__(request, response)
+        super(BaseHandler, self).__init__(request, response)
         # All the responses are JSON.
         self.response.content_type = 'application/json'
         self.user = None

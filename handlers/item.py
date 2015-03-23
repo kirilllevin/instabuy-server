@@ -4,116 +4,15 @@ from google.appengine.api import images
 from google.appengine.api import search
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
-from google.appengine.ext.webapp import blobstore_handlers
 from webapp2_extras import json
 
 import constants
 import error_codes
-import instabuy_handler
-import user_utils
+import base
 import models
 
 
-class DefaultHandler(instabuy_handler.InstabuyHandler):
-    def get(self):
-        self.response.write('This is the default handler!')
-
-
-class Register(instabuy_handler.InstabuyHandler):
-    @ndb.toplevel
-    def get(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.get('fb_access_token')
-        if not fb_access_token:
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-
-        # Use the token to get the Facebook user id.
-        try:
-            fb_user_id = user_utils.get_facebook_user_id(fb_access_token)
-        except user_utils.FacebookTokenExpiredException:
-            self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
-            return
-        except user_utils.FacebookException as e:
-            self.populate_error_response(error_codes.FACEBOOK_ERROR, e)
-            return
-
-        # Check if the user is already registered.
-        user = models.User.query(models.User.third_party_id == fb_user_id).get()
-        if user:
-            self.populate_error_response(error_codes.ACCOUNT_EXISTS)
-            return
-
-        # Store a new user entry.
-        user = models.User(login_type='facebook',
-                           third_party_id=fb_user_id)
-        user.put()
-        self.populate_success_response()
-
-
-class ClearAllEntry(instabuy_handler.InstabuyHandler):
-    @ndb.toplevel
-    def get(self):
-        ndb.delete_multi(models.User.query().fetch(keys_only=True))
-        ndb.delete_multi(models.LikeState.query().fetch(keys_only=True))
-        ndb.delete_multi(models.Item.query().fetch(keys_only=True))
-        ndb.delete_multi(models.Image().query().fetch(keys_only=True))
-        self.populate_success_response()
-
-
-class GetImageUploadUrl(instabuy_handler.InstabuyHandler):
-    @ndb.toplevel
-    def get(self):
-        self.populate_success_response(
-            {'upload_url': blobstore.create_upload_url('/upload_image')})
-
-
-class UploadImage(blobstore_handlers.BlobstoreUploadHandler,
-                  instabuy_handler.InstabuyHandler):
-    @ndb.toplevel
-    def post(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.POST['fb_access_token']
-        item_id = self.request.POST['item_id']
-
-        # Verify that the request is formed correctly.
-        malformed_request = False
-        try:
-            if not (fb_access_token and item_id):
-                malformed_request = True
-            else:
-                item_id = long(item_id)
-        except ValueError:
-            malformed_request = False
-
-        if malformed_request:
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-
-        # Check that something was uploaded.
-        uploads = self.get_uploads()
-        if not uploads:
-            self.populate_error_response(error_codes.UPLOAD_FAILED)
-            return
-        image_key = uploads[0].key()
-
-        if not (self.populate_user(fb_access_token) and
-                self.populate_item_for_mutation(item_id)):
-            # Delete the blob.
-            blobstore.delete(image_key)
-            return
-
-        # Append the image key to the item's list of images.
-        image = models.Image(blob_key=image_key,
-                             url=images.get_serving_url(image_key))
-
-        self.item.image.append(image)
-        self.item.put()
-
-        self.populate_success_response()
-
-
-class PostItem(instabuy_handler.InstabuyHandler):
+class Post(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         # Verify that the required parameters were supplied.
@@ -175,12 +74,12 @@ class PostItem(instabuy_handler.InstabuyHandler):
         self.populate_success_response({'item_id': item_key.id()})
 
 
-class DeleteItem(instabuy_handler.InstabuyHandler):
+class Delete(base.BaseHandler):
     @ndb.toplevel
-    def get(self):
+    def post(self):
         # Verify that the required parameters were supplied.
-        fb_access_token = self.request.get('fb_access_token')
-        item_id = self.request.get('item_id')
+        fb_access_token = self.request.POST['fb_access_token']
+        item_id = self.request.POST['item_id']
         malformed_request = False
         try:
             if not (fb_access_token and item_id):
@@ -247,57 +146,7 @@ class DeleteItem(instabuy_handler.InstabuyHandler):
         self.populate_success_response()
 
 
-class UpdateItemLikeState(instabuy_handler.InstabuyHandler):
-    @ndb.toplevel
-    def get(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.get('fb_access_token')
-        item_id = self.request.get('item_id')
-        like_state = self.request.get('like_state')
-
-        malformed_request = False
-        try:
-            if not (fb_access_token and item_id and like_state):
-                malformed_request = True
-            else:
-                like_state = int(like_state)
-                item_id = long(item_id)
-                # Ensure that like_state is either 1 (like) or 0 (dislike).
-                if like_state != 0 and like_state != 1:
-                    malformed_request = True
-        except ValueError:
-            malformed_request = True
-        if malformed_request:
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-
-        # Retrieve the relevant user and item objects.
-        if not self.populate_user(fb_access_token):
-            return
-        if not self.populate_item(item_id):
-            return
-
-        # Check if we already recorded a like state for this user, item pair.
-        # If it exists, simply update it, otherwise store a new one.
-        query = models.LikeState.query(
-            models.LikeState.item_id == self.item.key)
-        item_like_state = query.filter(
-            models.LikeState.user_id == self.user.key).get()
-        if item_like_state:
-            item_like_state.like_state = bool(like_state)
-        else:
-            item_like_state = models.LikeState(
-                parent=self.item.key,
-                user_id=self.user.key,
-                like_state=bool(like_state))
-            # Mark that the user has now seen this item.
-            self.user.seen_items.append(self.item.key.id())
-            self.user.put_async()
-        item_like_state.put_async()
-        self.populate_success_response()
-
-
-class GetItems(instabuy_handler.InstabuyHandler):
+class Get(base.BaseHandler):
     @ndb.toplevel
     def get(self):
         # Verify that the required parameters were supplied.
