@@ -16,6 +16,67 @@ import user_utils
 app = webtest.TestApp(main.app)
 
 
+class PostTest(unittest.TestCase):
+    nosegae_blobstore = True
+    nosegae_datastore_v3 = True
+    nosegae_search = True
+
+    def setUp(self):
+        self.original_get_facebook_user_id = user_utils.get_facebook_user_id
+
+        def mock_get_facebook_user_id(fb_access_token):
+            return str(fb_access_token)
+        user_utils.get_facebook_user_id = mock_get_facebook_user_id
+
+        self.user = models.User(login_type='facebook', third_party_id='1')
+        self.user_key = self.user.put()
+        self.item_index = search.Index(name=constants.ITEM_INDEX_NAME)
+        self.params = {
+            'fb_access_token': 1,
+            'title': 'fake_title',
+            'description': 'fake_description',
+            'price': 10.00,
+            'currency': 'USD',
+            'category': 'other',
+            'lat': 0,
+            'lng': 0,
+        }
+
+    def tearDown(self):
+        user_utils.get_facebook_user_id = self.original_get_facebook_user_id
+
+    def test_post_invalid_latlng(self):
+        self.params['lat'] = 900
+        response = app.post('/post_item',
+                            params=self.params,
+                            expect_errors=True)
+        self.assertEqual(httplib.BAD_REQUEST, response.status_int)
+        response_body = json.decode(response.body)
+        self.assertEqual(error_codes.MALFORMED_REQUEST.code,
+                         response_body['error']['error_code'])
+
+    def test_post_simple(self):
+        response = app.post('/post_item', params=self.params)
+        self.assertEqual(httplib.OK, response.status_int)
+        response_body = json.decode(response.body)
+        item_id = long(response_body['item_id'])
+
+        # Check that the item object was created.
+        item = models.Item.get_by_id(item_id)
+        self.assertIsNotNone(item)
+        self.assertEqual(self.user_key, item.user_id)
+
+        # Check that the search document was created.
+        doc = self.item_index.get(str(item_id))
+        self.assertIsNotNone(doc)
+        self.assertEqual('fake_title', doc.field('title').value)
+        self.assertEqual('fake_description', doc.field('description').value)
+        self.assertEqual(10, doc.field('price').value)
+        self.assertEqual('USD', doc.field('currency').value)
+        self.assertEqual('other', doc.field('category').value)
+        self.assertEqual(search.GeoPoint(0, 0), doc.field('location').value)
+
+
 class DeleteTest(unittest.TestCase):
     # Enable the relevant stubs.
     nosegae_blobstore = True

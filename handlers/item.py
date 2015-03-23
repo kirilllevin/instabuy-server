@@ -21,7 +21,7 @@ class Post(base.BaseHandler):
         description = self.request.POST['description']
         price = self.request.POST['price']
         currency = self.request.POST['currency']
-        category = self.request.POST.getall('category')
+        category = self.request.POST.get('category')
         lat = self.request.POST['lat']
         lng = self.request.POST['lng']
 
@@ -33,6 +33,9 @@ class Post(base.BaseHandler):
             else:
                 lat = float(lat)
                 lng = float(lng)
+                price = float(price)
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    malformed_request = True
         except ValueError:
             malformed_request = True
 
@@ -44,25 +47,26 @@ class Post(base.BaseHandler):
         if not self.populate_user(fb_access_token):
             return
 
-        item = models.Item(user_id=self.user.key())
+        item = models.Item(user_id=self.user.key)
         item_key = item.put()
 
-        fields = [
-            # Include the user ID so we can skip items owned by a user in
-            # queries.
-            search.AtomField(name='user_id', value=str(self.user.key.id())),
-            search.AtomField(name='category', value=category),
-            search.TextField(name='title', value=title),
-            search.TextField(name='description', value=description),
-            search.TextField(name='price', value=price),
-            search.TextField(name='currency', value=currency),
-            search.GeoField(name='location', value=search.GeoPoint(lat, lng))]
-
-        # The Item object's id is shared with the document.
-        item_doc = search.Document(
-            doc_id=str(item_key.id()),
-            fields=fields)
         try:
+            fields = [
+                # Include the user ID so we can skip items owned by a user in
+                # queries.
+                search.AtomField(name='user_id', value=str(self.user.key.id())),
+                search.AtomField(name='category', value=category),
+                search.TextField(name='title', value=title),
+                search.TextField(name='description', value=description),
+                search.NumberField(name='price', value=price),
+                search.TextField(name='currency', value=currency),
+                search.GeoField(name='location',
+                                value=search.GeoPoint(lat, lng))]
+            # The Item object's id is shared with the document.
+            item_doc = search.Document(
+                doc_id=str(item_key.id()),
+                fields=fields)
+
             index = search.Index(name=constants.ITEM_INDEX_NAME)
             index.put(item_doc)
         except search.Error:
@@ -173,6 +177,8 @@ class Get(base.BaseHandler):
                     malformed_request = not (lat and lng)
                     lat = float(lat)
                     lng = float(lng)
+                    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                        malformed_request = True
                 elif request_type == constants.RETRIEVAL_SEARCH:
                     # Search query must be provided.
                     malformed_request = not user_query
@@ -234,11 +240,11 @@ class Get(base.BaseHandler):
                         'item_id': document.doc_id,
                         'date_time_added': '',
                         'date_time_modified': '',
-                        'title': document.field('title'),
-                        'category': document.field('category'),
-                        'description': document.field('description'),
-                        'price': document.field('price'),
-                        'currency': document.field('currency'),
+                        'title': document.field('title').value,
+                        'category': document.field('category').value,
+                        'description': document.field('description').value,
+                        'price': document.field('price').value,
+                        'currency': document.field('currency').value,
                         'image': [i.url for i in item.image],
                     }
                     returned_results.append(item_dict)
