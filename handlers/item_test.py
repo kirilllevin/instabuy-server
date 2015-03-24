@@ -1,9 +1,7 @@
-from google.appengine.api import files
 from google.appengine.api import search
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 import httplib
-import unittest
 from webapp2_extras import json
 import webtest
 
@@ -11,44 +9,31 @@ import constants
 import error_codes
 import main
 import models
-import user_utils
+import test_utils
 
 app = webtest.TestApp(main.app)
 
 
-class PostTest(unittest.TestCase):
-    nosegae_blobstore = True
+class PostTest(test_utils.HandlerTest):
     nosegae_datastore_v3 = True
     nosegae_search = True
 
-    def setUp(self):
-        self.original_get_facebook_user_id = user_utils.get_facebook_user_id
-
-        def mock_get_facebook_user_id(fb_access_token):
-            return str(fb_access_token)
-        user_utils.get_facebook_user_id = mock_get_facebook_user_id
-
-        self.user = models.User(login_type='facebook', third_party_id='1')
-        self.user_key = self.user.put()
-        self.item_index = search.Index(name=constants.ITEM_INDEX_NAME)
-        self.params = {
-            'fb_access_token': 1,
-            'title': 'fake_title',
-            'description': 'fake_description',
-            'price': 10.00,
-            'currency': 'USD',
-            'category': 'other',
-            'lat': 0,
-            'lng': 0,
-        }
-
-    def tearDown(self):
-        user_utils.get_facebook_user_id = self.original_get_facebook_user_id
+    params = {
+        'fb_access_token': 1,
+        'title': 'fake_title',
+        'description': 'fake_description',
+        'price': 10.00,
+        'currency': 'USD',
+        'category': 'other',
+        'lat': 0,
+        'lng': 0,
+    }
 
     def test_post_invalid_latlng(self):
-        self.params['lat'] = 900
+        params = self.params.copy()
+        params['lat'] = 900
         response = app.post('/post_item',
-                            params=self.params,
+                            params=params,
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -67,7 +52,8 @@ class PostTest(unittest.TestCase):
         self.assertEqual(self.user_key, item.user_id)
 
         # Check that the search document was created.
-        doc = self.item_index.get(str(item_id))
+        item_index = search.Index(name=constants.ITEM_INDEX_NAME)
+        doc = item_index.get(str(item_id))
         self.assertIsNotNone(doc)
         self.assertEqual('fake_title', doc.field('title').value)
         self.assertEqual('fake_description', doc.field('description').value)
@@ -77,27 +63,12 @@ class PostTest(unittest.TestCase):
         self.assertEqual(search.GeoPoint(0, 0), doc.field('location').value)
 
 
-class DeleteTest(unittest.TestCase):
+class DeleteTest(test_utils.HandlerTest):
     # Enable the relevant stubs.
     nosegae_blobstore = True
     nosegae_datastore_v3 = True
-    nosegae_file = True
     nosegae_images = True
     nosegae_search = True
-
-    def setUp(self):
-        self.original_get_facebook_user_id = user_utils.get_facebook_user_id
-
-        def mock_get_facebook_user_id(fb_access_token):
-            return str(fb_access_token)
-        user_utils.get_facebook_user_id = mock_get_facebook_user_id
-
-        self.user = models.User(login_type='facebook', third_party_id='1')
-        self.user_key = self.user.put()
-        self.item_index = search.Index(name=constants.ITEM_INDEX_NAME)
-
-    def tearDown(self):
-        user_utils.get_facebook_user_id = self.original_get_facebook_user_id
 
     def test_delete_invalid_item(self):
         # Ensure that there is no item with id=7.
@@ -127,12 +98,11 @@ class DeleteTest(unittest.TestCase):
                          response_body['error']['error_code'])
 
     def test_successful_delete(self):
+        item_index = search.Index(name=constants.ITEM_INDEX_NAME)
         # Set up the item we're going to delete.
-        file_name = files.blobstore.create(mime_type='application/octet-stream')
-        with files.open(file_name, 'a') as f:
-            f.write('fake_image_data')
-        files.finalize(file_name)
-        blob_key = files.blobstore.get_blob_key(file_name)
+        self.testbed.get_stub('blobstore').CreateBlob(
+            'blob_key', 'fake_image_data')
+        blob_key = blobstore.BlobKey('blob_key')
         self.assertIsNotNone(blobstore.get(blob_key))
 
         image = models.Image(blob_key=blob_key, url='/fake')
@@ -150,8 +120,8 @@ class DeleteTest(unittest.TestCase):
         item_doc = search.Document(
             doc_id=str(item_key.id()),
             fields=fields)
-        self.item_index.put(item_doc)
-        self.assertIsNotNone(self.item_index.get(str(item_key.id())))
+        item_index.put(item_doc)
+        self.assertIsNotNone(item_index.get(str(item_key.id())))
 
         # Set up a second user that has seen this item.
         other_user = models.User(login_type='facebook',
@@ -178,7 +148,7 @@ class DeleteTest(unittest.TestCase):
         self.assertListEqual([], other_user.seen_items)
 
         # Check that the associated search document was deleted.
-        self.assertIsNone(self.item_index.get(str(item_key.id())))
+        self.assertIsNone(item_index.get(str(item_key.id())))
 
         # Check that the associated image was deleted from the blobstore.
         self.assertIsNone(blobstore.get(blob_key))
@@ -188,3 +158,4 @@ class DeleteTest(unittest.TestCase):
 
         # Check that the item itself was deleted.
         self.assertIsNone(item_key.get())
+
