@@ -33,7 +33,8 @@ class PostTest(test_utils.HandlerTest):
         params = self.params.copy()
         params['lat'] = 900
         response = app.post('/post_item',
-                            params=params,
+                            params=json.encode(params),
+                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -41,7 +42,9 @@ class PostTest(test_utils.HandlerTest):
                          response_body['error']['error_code'])
 
     def test_post_simple(self):
-        response = app.post('/post_item', params=self.params)
+        response = app.post('/post_item',
+                            params=json.encode(self.params),
+                            content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
         response_body = json.decode(response.body)
         item_id = long(response_body['item_id'])
@@ -76,8 +79,9 @@ class DeleteTest(test_utils.HandlerTest):
 
         # Now try to delete it.
         response = app.post('/delete_item',
-                            params={'fb_access_token': 1,
-                                    'item_id': 7},
+                            params=json.encode({'fb_access_token': 1,
+                                                'item_id': 7}),
+                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -89,8 +93,9 @@ class DeleteTest(test_utils.HandlerTest):
         item = models.Item(user_id=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
         response = app.post('/delete_item',
-                            params={'fb_access_token': 1,
-                                    'item_id': item_key.id()},
+                            params=json.encode({'fb_access_token': 1,
+                                                'item_id': item_key.id()}),
+                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -136,8 +141,9 @@ class DeleteTest(test_utils.HandlerTest):
 
         # Delete the item.
         response = app.post('/delete_item',
-                            params={'fb_access_token': 1,
-                                    'item_id': item_key.id()})
+                            params=json.encode({'fb_access_token': 1,
+                                                'item_id': item_key.id()}),
+                            content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_items list no longer has this

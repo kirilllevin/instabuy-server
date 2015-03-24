@@ -18,21 +18,10 @@ class GetUploadUrl(base.BaseHandler):
 class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
     @ndb.toplevel
     def post(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.POST['fb_access_token']
-        item_id = self.request.POST['item_id']
-
-        # Verify that the request is formed correctly.
-        malformed_request = False
-        try:
-            if not (fb_access_token and item_id):
-                malformed_request = True
-            else:
-                item_id = long(item_id)
-        except ValueError:
-            malformed_request = False
-
-        if malformed_request:
+        success = self.parse_request(
+            {'fb_access_token': (str, True, None),
+             'item_id': (long, True, None)})
+        if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
@@ -43,8 +32,8 @@ class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
             return
         image_key = uploads[0].key()
 
-        if not (self.populate_user(fb_access_token) and
-                self.populate_item_for_mutation(item_id)):
+        if not (self.populate_user(self.args['fb_access_token']) and
+                self.populate_item_for_mutation(self.args['item_id'])):
             # Delete the blob.
             blobstore.delete(image_key)
             return

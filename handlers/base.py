@@ -12,8 +12,46 @@ class BaseHandler(webapp2.RequestHandler):
         super(BaseHandler, self).__init__(request, response)
         # All the responses are JSON.
         self.response.content_type = 'application/json'
+        self.args = {}
         self.user = None
         self.item = None
+
+    def parse_request(self, allowed_args):
+        """Parse the parameters from the request into a dictionary.
+
+        :param allowed_args: A dictionary from names of arguments to
+          (type, required, validate) triples, where type is the builtin cast
+          function for the expected type of the argument, required is a
+          boolean indicating whether or not this arg is required, and validate
+          is a lambda that enforces additional constraints on the value.
+          Only these arguments are permitted.
+        :return: True if the parse was successful, False if there were any
+          errors in the supplied values.
+        """
+        # We expect all requests to be JSON.
+        if self.request.content_type != 'application/json':
+            return False
+        num_args = 0
+        try:
+            body_json = json.decode(self.request.body)
+            for arg_name, type_tuple in allowed_args.iteritems():
+                t, required, validate = type_tuple
+                if arg_name not in body_json.keys():
+                    if required:
+                        return False
+                    else:
+                        continue
+                # Try casting the value to the given type.
+                value = t(body_json[arg_name])
+                # Run the validation function if it's present.
+                if validate and not validate(value):
+                    return False
+                self.args[arg_name] = value
+                num_args += 1
+        except ValueError:
+            return False
+        # Final check to ensure that no additional params were supplied.
+        return num_args == len(body_json)
 
     def populate_error_response(self, error_code, message=None):
         self.response.status_int = httplib.BAD_REQUEST

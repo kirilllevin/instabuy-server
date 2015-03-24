@@ -15,36 +15,21 @@ import models
 class Post(base.BaseHandler):
     @ndb.toplevel
     def post(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.POST['fb_access_token']
-        title = self.request.POST['title']
-        description = self.request.POST['description']
-        price = self.request.POST['price']
-        currency = self.request.POST['currency']
-        category = self.request.POST.get('category')
-        lat = self.request.POST['lat']
-        lng = self.request.POST['lng']
-
-        malformed_request = False
-        try:
-            if not (fb_access_token and title and description and price and
-                    currency and category and lat and lng):
-                malformed_request = True
-            else:
-                lat = float(lat)
-                lng = float(lng)
-                price = float(price)
-                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                    malformed_request = True
-        except ValueError:
-            malformed_request = True
-
-        if malformed_request:
+        success = self.parse_request(
+            {'fb_access_token': (str, True, None),
+             'title':       (str, True, None),
+             'description': (str, True, None),
+             'price':       (float, True, None),
+             'currency':    (str, True, None),
+             'category':    (str, True, None),
+             'lat':         (float, True, lambda x: -90 <= x <= 90),
+             'lng':         (float, True, lambda x: -180 <= x <= 180)})
+        if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
         # Retrieve the user associated with the Facebook token.
-        if not self.populate_user(fb_access_token):
+        if not self.populate_user(self.args['fb_access_token']):
             return
 
         item = models.Item(user_id=self.user.key)
@@ -55,13 +40,15 @@ class Post(base.BaseHandler):
                 # Include the user ID so we can skip items owned by a user in
                 # queries.
                 search.AtomField(name='user_id', value=str(self.user.key.id())),
-                search.AtomField(name='category', value=category),
-                search.TextField(name='title', value=title),
-                search.TextField(name='description', value=description),
-                search.NumberField(name='price', value=price),
-                search.TextField(name='currency', value=currency),
+                search.AtomField(name='category', value=self.args['category']),
+                search.TextField(name='title', value=self.args['title']),
+                search.TextField(name='description',
+                                 value=self.args['description']),
+                search.NumberField(name='price', value=self.args['price']),
+                search.TextField(name='currency', value=self.args['currency']),
                 search.GeoField(name='location',
-                                value=search.GeoPoint(lat, lng))]
+                                value=search.GeoPoint(
+                                    self.args['lat'], self.args['lng']))]
             # The Item object's id is shared with the document.
             item_doc = search.Document(
                 doc_id=str(item_key.id()),
@@ -81,25 +68,16 @@ class Post(base.BaseHandler):
 class Delete(base.BaseHandler):
     @ndb.toplevel
     def post(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.POST['fb_access_token']
-        item_id = self.request.POST['item_id']
-        malformed_request = False
-        try:
-            if not (fb_access_token and item_id):
-                malformed_request = True
-            else:
-                item_id = long(item_id)
-        except ValueError:
-            malformed_request = True
-
-        if malformed_request:
+        success = self.parse_request(
+            {'fb_access_token': (str, True, None),
+             'item_id': (long, True, None)})
+        if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
-        if not self.populate_user(fb_access_token):
+        if not self.populate_user(self.args['fb_access_token']):
             return
-        if not self.populate_item_for_mutation(item_id):
+        if not self.populate_item_for_mutation(self.args['item_id']):
             return
 
         # Delete all the likes/dislikes of this item by removing all the
@@ -153,41 +131,18 @@ class Delete(base.BaseHandler):
 class Get(base.BaseHandler):
     @ndb.toplevel
     def get(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.get('fb_access_token')
-        request_type = self.request.get('request_type')
-        cursor = search.Cursor(web_safe_string=self.request.get('cursor'))
-        category = self.request.get('category')
-        user_query = self.request.get('query')
-        lat = self.request.get('lat')
-        lng = self.request.get('lng')
-
-        malformed_request = False
-        try:
-            if not (fb_access_token and request_type):
-                malformed_request = True
-            else:
-                # Validate that the request contained all the necessary data for
-                # the given request type.
-                if request_type == constants.RETRIEVAL_CATEGORY:
-                    # Category must be provided.
-                    malformed_request = not category
-                elif request_type == constants.RETRIEVAL_NEARBY:
-                    # Lat/lng must be provided.
-                    malformed_request = not (lat and lng)
-                    lat = float(lat)
-                    lng = float(lng)
-                    if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                        malformed_request = True
-                elif request_type == constants.RETRIEVAL_SEARCH:
-                    # Search query must be provided.
-                    malformed_request = not user_query
-        except ValueError:
-            malformed_request = True
-
-        if malformed_request:
+        success = self.parse_request(
+            {'fb_access_token': (str, True, None),
+             'lat':          (float, True, lambda x: -90 <= x <= 90),
+             'lng':          (float, True, lambda x: -180 <= x <= 180),
+             'category':     (str, False, None),
+             'search_query': (str, False, None),
+             'cursor':       (str, False, None)})
+        if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
+
+        cursor = search.Cursor(web_safe_string=self.args['cursor'])
 
         # Populate a set containing the ids of all the items that the user has
         # already seen. These will need to be skipped.
@@ -196,22 +151,18 @@ class Get(base.BaseHandler):
         # This will store dict representations
         returned_results = []
 
-        # Figure out which query to use based on the request type.
-        if request_type == constants.RETRIEVAL_CATEGORY:
-            query = 'category={}'.format(category)
-        elif request_type == constants.RETRIEVAL_NEARBY:
-            # This query is already complex because of the distance search,
-            # so may as well filter out the user here.
-            query = ('distance(location, geopoint({}, {})) < {} AND '
-                     'NOT user_id={}').format(
-                lat, lng, self.user.distance_radius_km, self.user.key.id())
-        elif request_type == constants.RETRIEVAL_SEARCH:
-            # TODO: Revisit this, it looks totally insecure.
-            # TODO: Add stemming.
-            query = user_query
-        else:
-            self.populate_error_response(error_codes.GENERIC_ERROR,
-                                         'Unimplemented')
+        query = [
+            'distance(location, geopoint({}, {})) < {}'.format(
+                self.args['lat'], self.args['lng'],
+                self.user.distance_radius_km),
+            'NOT user_id={}'.format(self.user.key.id())]
+        if self.args['category']:
+            query.append('category={}'.format(self.args['category']))
+        if self.args['search_query']:
+            # Split the search query on whitespace, convert to lowercase and
+            # stem each word. then join on space and add to the query.
+            t = ['~' + t for t in self.args['search_query'].lower().split()]
+            query.append(' '.join(t))
 
         begin_search = True
         item_index = search.Index(constants.ITEM_INDEX_NAME)
@@ -220,7 +171,7 @@ class Get(base.BaseHandler):
                    (begin_search or cursor is not None)):
                 begin_search = False
                 search_response = item_index.search(
-                    search.Query(query,
+                    search.Query(' AND '.join(query),
                                  options=search.QueryOptions(
                                      limit=constants.NUM_ITEMS_PER_PAGE,
                                      cursor=cursor)))
@@ -255,7 +206,7 @@ class Get(base.BaseHandler):
             logging.error(
                 'Item search failed for query="{}". Message: {}'.format(
                     query, e.message))
-            self.populate_error_response(error_codes.SEARCH_ERROR, request_type)
+            self.populate_error_response(error_codes.SEARCH_ERROR)
             return
 
         self.populate_success_response(

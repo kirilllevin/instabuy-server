@@ -9,15 +9,16 @@ import user_utils
 class Register(base.BaseHandler):
     @ndb.toplevel
     def post(self):
-        # Verify that the required parameters were supplied.
-        fb_access_token = self.request.POST['fb_access_token']
-        if not fb_access_token:
+        success = self.parse_request(
+            {'fb_access_token': (str, True, None)})
+        if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
         # Use the token to get the Facebook user id.
         try:
-            fb_user_id = user_utils.get_facebook_user_id(fb_access_token)
+            fb_user_id = user_utils.get_facebook_user_id(
+                self.args['fb_access_token'])
         except user_utils.FacebookTokenExpiredException:
             self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
             return
