@@ -6,6 +6,10 @@ import user_utils
 
 class HandlerTest(unittest.TestCase):
 
+    headers = {
+        'X-Auth-Token': '1'
+    }
+
     def setUp(self):
         self.original_get_facebook_user_id = user_utils.get_facebook_user_id
 

@@ -19,7 +19,6 @@ class PostTest(test_utils.HandlerTest):
     nosegae_search = True
 
     params = {
-        'fb_access_token': 1,
         'title': 'fake_title',
         'description': 'fake_description',
         'price': 10.00,
@@ -34,6 +33,7 @@ class PostTest(test_utils.HandlerTest):
         params['lat'] = 900
         response = app.post('/post_item',
                             params=json.encode(params),
+                            headers=self.headers,
                             content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
@@ -44,6 +44,7 @@ class PostTest(test_utils.HandlerTest):
     def test_post_simple(self):
         response = app.post('/post_item',
                             params=json.encode(self.params),
+                            headers=self.headers,
                             content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
         response_body = json.decode(response.body)
@@ -79,8 +80,8 @@ class DeleteTest(test_utils.HandlerTest):
 
         # Now try to delete it.
         response = app.post('/delete_item',
-                            params=json.encode({'fb_access_token': 1,
-                                                'item_id': 7}),
+                            params=json.encode({'item_id': 7}),
+                            headers=self.headers,
                             content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
@@ -93,8 +94,8 @@ class DeleteTest(test_utils.HandlerTest):
         item = models.Item(user_id=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
         response = app.post('/delete_item',
-                            params=json.encode({'fb_access_token': 1,
-                                                'item_id': item_key.id()}),
+                            params=json.encode({'item_id': item_key.id()}),
+                            headers=self.headers,
                             content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
@@ -141,8 +142,8 @@ class DeleteTest(test_utils.HandlerTest):
 
         # Delete the item.
         response = app.post('/delete_item',
-                            params=json.encode({'fb_access_token': 1,
-                                                'item_id': item_key.id()}),
+                            params=json.encode({'item_id': item_key.id()}),
+                            headers=self.headers,
                             content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
 

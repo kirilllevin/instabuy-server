@@ -9,15 +9,14 @@ class Update(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
-            {'fb_access_token': (str, True, None),
-             'item_id':    (long, True, None),
+            {'item_id':    (long, True, None),
              'like_state': (int, True, lambda x: x == 0 or x == 1)})
         if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
         # Retrieve the relevant user and item objects.
-        if not self.populate_user(self.args['fb_access_token']):
+        if not self.populate_user():
             return
         if not self.populate_item(self.args['item_id']):
             return

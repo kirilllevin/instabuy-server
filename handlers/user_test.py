@@ -14,6 +14,10 @@ class RegisterTest(test_utils.HandlerTest):
     # enable the datastore stub
     nosegae_datastore_v3 = True
 
+    headers = {
+        'X-Auth-Token': '2'
+    }
+
     def test_new_user(self):
         # At first, there should be no account.
         user = models.User.query(models.User.third_party_id == '2').get()
@@ -21,7 +25,7 @@ class RegisterTest(test_utils.HandlerTest):
 
         # Now register.
         response = app.post('/register',
-                            params=json.encode({'fb_access_token': 2}),
+                            headers=self.headers,
                             content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
 
@@ -32,13 +36,13 @@ class RegisterTest(test_utils.HandlerTest):
     def test_register_twice_is_error(self):
         # Registering once works.
         response = app.post('/register',
-                            params=json.encode({'fb_access_token': 2}),
+                            headers=self.headers,
                             content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
 
         # Registering a second time should give errors.
         response = app.post('/register',
-                            params=json.encode({'fb_access_token': 2}),
+                            headers=self.headers,
                             content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)

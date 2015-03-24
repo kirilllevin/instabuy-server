@@ -68,7 +68,7 @@ class BaseHandler(webapp2.RequestHandler):
         full_dict.update(response_dict)
         self.response.write(json.encode(full_dict))
 
-    def populate_user(self, fb_access_token):
+    def populate_user(self):
         """Load a models.User corresponding to a Facebook access token.
 
         The loaded user is stored in self.user.
@@ -84,6 +84,7 @@ class BaseHandler(webapp2.RequestHandler):
           True if the populate succeeded, False otherwise.
         """
         # Use the token to get the Facebook user id.
+        fb_access_token = self.request.headers.get("x-auth-token")
         try:
             fb_user_id = user_utils.get_facebook_user_id(fb_access_token)
         except user_utils.FacebookTokenExpiredException:

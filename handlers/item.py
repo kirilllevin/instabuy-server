@@ -16,8 +16,7 @@ class Post(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
-            {'fb_access_token': (str, True, None),
-             'title':       (str, True, None),
+            {'title':       (str, True, None),
              'description': (str, True, None),
              'price':       (float, True, None),
              'currency':    (str, True, None),
@@ -29,7 +28,7 @@ class Post(base.BaseHandler):
             return
 
         # Retrieve the user associated with the Facebook token.
-        if not self.populate_user(self.args['fb_access_token']):
+        if not self.populate_user():
             return
 
         item = models.Item(user_id=self.user.key)
@@ -69,13 +68,12 @@ class Delete(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
-            {'fb_access_token': (str, True, None),
-             'item_id': (long, True, None)})
+            {'item_id': (long, True, None)})
         if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
 
-        if not self.populate_user(self.args['fb_access_token']):
+        if not self.populate_user():
             return
         if not self.populate_item_for_mutation(self.args['item_id']):
             return
@@ -132,14 +130,15 @@ class Get(base.BaseHandler):
     @ndb.toplevel
     def get(self):
         success = self.parse_request(
-            {'fb_access_token': (str, True, None),
-             'lat':          (float, True, lambda x: -90 <= x <= 90),
+            {'lat':          (float, True, lambda x: -90 <= x <= 90),
              'lng':          (float, True, lambda x: -180 <= x <= 180),
              'category':     (str, False, None),
              'search_query': (str, False, None),
              'cursor':       (str, False, None)})
         if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
+            return
+        if not self.populate_user():
             return
 
         cursor = search.Cursor(web_safe_string=self.args['cursor'])

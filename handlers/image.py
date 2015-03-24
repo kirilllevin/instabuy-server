@@ -19,8 +19,7 @@ class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
-            {'fb_access_token': (str, True, None),
-             'item_id': (long, True, None)})
+            {'item_id': (long, True, None)})
         if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
@@ -32,7 +31,7 @@ class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
             return
         image_key = uploads[0].key()
 
-        if not (self.populate_user(self.args['fb_access_token']) and
+        if not (self.populate_user() and
                 self.populate_item_for_mutation(self.args['item_id'])):
             # Delete the blob.
             blobstore.delete(image_key)
