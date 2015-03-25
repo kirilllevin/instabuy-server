@@ -31,18 +31,23 @@ class BaseHandler(webapp2.RequestHandler):
         # We expect all requests to be JSON.
         if self.request.content_type != 'application/json':
             return False
+        if self.request.method == 'GET':
+            args_dict = self.request.GET;
+        elif self.request.method == 'POST':
+            args_dict = json.decode(self.request.body)
+        else:
+            return False
         num_args = 0
         try:
-            body_json = json.decode(self.request.body)
             for arg_name, type_tuple in allowed_args.iteritems():
                 t, required, validate = type_tuple
-                if arg_name not in body_json.keys():
+                if arg_name not in args_dict.keys():
                     if required:
                         return False
                     else:
                         continue
                 # Try casting the value to the given type.
-                value = t(body_json[arg_name])
+                value = t(args_dict[arg_name])
                 # Run the validation function if it's present.
                 if validate and not validate(value):
                     return False
@@ -51,7 +56,7 @@ class BaseHandler(webapp2.RequestHandler):
         except ValueError:
             return False
         # Final check to ensure that no additional params were supplied.
-        return num_args == len(body_json)
+        return num_args == len(args_dict)
 
     def populate_error_response(self, error_code, message=None):
         self.response.status_int = httplib.BAD_REQUEST

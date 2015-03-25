@@ -1,3 +1,4 @@
+from google.appengine.ext import ndb
 import unittest
 
 import models
@@ -7,7 +8,8 @@ import user_utils
 class HandlerTest(unittest.TestCase):
 
     headers = {
-        'X-Auth-Token': '1'
+        'X-Auth-Token': '1',
+        'Content-Type': 'application/json'
     }
 
     def setUp(self):
@@ -21,7 +23,10 @@ class HandlerTest(unittest.TestCase):
         self.user_key = self.user.put()
 
     def tearDown(self):
-        user_utils.get_facebook_user_id = self.original_get_facebook_user_id
+        # Delete all the data.
+        ndb.delete_multi(models.User.query().fetch(keys_only=True))
+        ndb.delete_multi(models.LikeState.query().fetch(keys_only=True))
+        ndb.delete_multi(models.Item.query().fetch(keys_only=True))
+        ndb.delete_multi(models.Image().query().fetch(keys_only=True))
 
-    def make_request(self, fb_access_token=1):
-        pass
+        user_utils.get_facebook_user_id = self.original_get_facebook_user_id

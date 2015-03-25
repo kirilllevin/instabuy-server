@@ -141,7 +141,9 @@ class Get(base.BaseHandler):
         if not self.populate_user():
             return
 
-        cursor = search.Cursor(web_safe_string=self.args['cursor'])
+        cursor = search.Cursor()
+        if 'cursor' in self.args:
+            cursor = search.Cursor(web_safe_string=self.args['cursor'])
 
         # Populate a set containing the ids of all the items that the user has
         # already seen. These will need to be skipped.
@@ -155,14 +157,13 @@ class Get(base.BaseHandler):
                 self.args['lat'], self.args['lng'],
                 self.user.distance_radius_km),
             'NOT user_id={}'.format(self.user.key.id())]
-        if self.args['category']:
+        if 'category' in self.args:
             query.append('category={}'.format(self.args['category']))
-        if self.args['search_query']:
+        if 'search_query' in self.args:
             # Split the search query on whitespace, convert to lowercase and
             # stem each word. then join on space and add to the query.
             t = ['~' + t for t in self.args['search_query'].lower().split()]
             query.append(' '.join(t))
-
         begin_search = True
         item_index = search.Index(constants.ITEM_INDEX_NAME)
         try:
@@ -183,9 +184,15 @@ class Get(base.BaseHandler):
                     if document.field('user_id') == str(self.user.key.id()):
                         continue
                     # Create a JSON representation of the item to be returned.
-                    item = models.Item.get_by_id(document.doc_id)
+                    item = models.Item.get_by_id(long(document.doc_id))
 
+                    image_list = []
+                    if item.image:
+                        # TODO: Generate proper collections of differently
+                        # sized image versions.
+                        image_list = [i.url for i in item.image]
                     # TODO: Figure out how to convert DateTimeProperty.
+                    location = document.field('location').value
                     item_dict = {
                         'item_id': document.doc_id,
                         'date_time_added': '',
@@ -195,7 +202,9 @@ class Get(base.BaseHandler):
                         'description': document.field('description').value,
                         'price': document.field('price').value,
                         'currency': document.field('currency').value,
-                        'image': [i.url for i in item.image],
+                        'image': image_list,
+                        'lat': location.latitude,
+                        'lng': location.longitude,
                     }
                     returned_results.append(item_dict)
                     if len(returned_results) == constants.NUM_ITEMS_PER_REQUEST:
@@ -208,6 +217,7 @@ class Get(base.BaseHandler):
             self.populate_error_response(error_codes.SEARCH_ERROR)
             return
 
-        self.populate_success_response(
-            {'results': json.encode(returned_results),
-             'cursor': cursor.web_safe_string()})
+        response_dict = {'results': returned_results}
+        if cursor:
+            response_dict['cursor'] = cursor.web_safe_string
+        self.populate_success_response(response_dict)
