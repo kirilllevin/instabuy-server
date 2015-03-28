@@ -11,8 +11,6 @@ app = webtest.TestApp(main.app)
 
 
 class PostTest(test_utils.HandlerTest):
-    nosegae_datastore_v3 = True
-
     def setUp(self):
         super(PostTest, self).setUp()
 

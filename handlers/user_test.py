@@ -11,9 +11,6 @@ app = webtest.TestApp(main.app)
 
 
 class RegisterTest(test_utils.HandlerTest):
-    # enable the datastore stub
-    nosegae_datastore_v3 = True
-
     headers = {
         'X-Auth-Token': '2',
         'Content-Type': 'application/json'
@@ -56,9 +53,6 @@ class RegisterTest(test_utils.HandlerTest):
 
 
 class UpdateTest(test_utils.HandlerTest):
-    # enable the datastore stub
-    nosegae_datastore_v3 = True
-
     def test_update_nonexisting_user(self):
         headers = self.headers
         headers['X-Auth-Token'] = '2'

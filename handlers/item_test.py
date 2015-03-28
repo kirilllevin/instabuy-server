@@ -15,9 +15,6 @@ app = webtest.TestApp(main.app)
 
 
 class PostTest(test_utils.HandlerTest):
-    nosegae_datastore_v3 = True
-    nosegae_search = True
-
     params = {
         'title': 'fake_title',
         'description': 'fake_description',
@@ -66,12 +63,6 @@ class PostTest(test_utils.HandlerTest):
 
 
 class ListTest(test_utils.HandlerTest):
-    # Enable the relevant stubs.
-    nosegae_blobstore = True
-    nosegae_datastore_v3 = True
-    nosegae_images = True
-    nosegae_search = True
-
     def setUp(self):
         super(ListTest, self).setUp()
         self.maxDiff = None
@@ -287,12 +278,6 @@ class ListTest(test_utils.HandlerTest):
 
 
 class DeleteTest(test_utils.HandlerTest):
-    # Enable the relevant stubs.
-    nosegae_blobstore = True
-    nosegae_datastore_v3 = True
-    nosegae_images = True
-    nosegae_search = True
-
     def test_delete_invalid_item(self):
         # Ensure that there is no item with id=7.
         self.assertIsNone(ndb.Key(models.Item, 7).get())

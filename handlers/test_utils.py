@@ -6,6 +6,11 @@ import user_utils
 
 
 class HandlerTest(unittest.TestCase):
+    # Enable all the relevant stubs.
+    nosegae_blobstore = True
+    nosegae_datastore_v3 = True
+    nosegae_images = True
+    nosegae_search = True
 
     headers = {
         'X-Auth-Token': '1',
