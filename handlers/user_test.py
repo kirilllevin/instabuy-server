@@ -26,8 +26,7 @@ class RegisterTest(test_utils.HandlerTest):
 
         # Now register.
         response = app.post('/register',
-                            headers=self.headers,
-                            content_type='application/json')
+                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
 
         # Now check that a User object was indeed created.
@@ -37,14 +36,12 @@ class RegisterTest(test_utils.HandlerTest):
     def test_register_twice_is_error(self):
         # Registering once works.
         response = app.post('/register',
-                            headers=self.headers,
-                            content_type='application/json')
+                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
 
         # Registering a second time should give errors.
         response = app.post('/register',
                             headers=self.headers,
-                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)

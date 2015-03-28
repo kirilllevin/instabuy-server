@@ -34,7 +34,6 @@ class PostTest(test_utils.HandlerTest):
         response = app.post('/post_item',
                             params=json.encode(params),
                             headers=self.headers,
-                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -44,8 +43,7 @@ class PostTest(test_utils.HandlerTest):
     def test_post_simple(self):
         response = app.post('/post_item',
                             params=json.encode(self.params),
-                            headers=self.headers,
-                            content_type='application/json')
+                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         response_body = json.decode(response.body)
         item_id = long(response_body['item_id'])
@@ -303,7 +301,6 @@ class DeleteTest(test_utils.HandlerTest):
         response = app.post('/delete_item',
                             params=json.encode({'item_id': 7}),
                             headers=self.headers,
-                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -318,7 +315,6 @@ class DeleteTest(test_utils.HandlerTest):
         response = app.post('/delete_item',
                             params=json.encode({'item_id': item_key.id()}),
                             headers=self.headers,
-                            content_type='application/json',
                             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -365,8 +361,7 @@ class DeleteTest(test_utils.HandlerTest):
         # Delete the item.
         response = app.post('/delete_item',
                             params=json.encode({'item_id': item_key.id()}),
-                            headers=self.headers,
-                            content_type='application/json')
+                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_item_ids list no longer has this
