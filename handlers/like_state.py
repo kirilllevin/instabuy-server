@@ -24,18 +24,18 @@ class Update(base.BaseHandler):
         # Check if we already recorded a like state for this user, item pair.
         # If it exists, simply update it, otherwise store a new one.
         query = models.LikeState.query(
-            models.LikeState.item_id == self.item.key)
+            models.LikeState.item_key == self.item.key)
         item_like_state = query.filter(
-            models.LikeState.user_id == self.user.key).get()
+            models.LikeState.user_key == self.user.key).get()
         if item_like_state:
             item_like_state.like_state = bool(self.args['like_state'])
         else:
             item_like_state = models.LikeState(
                 parent=self.item.key,
-                user_id=self.user.key,
+                user_key=self.user.key,
                 like_state=bool(self.args['like_state']))
             # Mark that the user has now seen this item.
-            self.user.seen_items.append(self.item.key.id())
+            self.user.seen_item_ids.append(self.item.key.id())
             self.user.put_async()
         item_like_state.put_async()
         self.populate_success_response()

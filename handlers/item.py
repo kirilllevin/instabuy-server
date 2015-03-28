@@ -31,7 +31,7 @@ class Post(base.BaseHandler):
         if not self.populate_user():
             return
 
-        item = models.Item(user_id=self.user.key)
+        item = models.Item(user_key=self.user.key)
         item_key = item.put()
 
         try:
@@ -81,12 +81,12 @@ class Delete(base.BaseHandler):
         # Delete all the likes/dislikes of this item by removing all the
         # LikedItemState objects that are mentioning this item.
         dislikes_query = models.LikeState.query(
-            models.LikeState.item_id == self.item.key)
+            models.LikeState.item_key == self.item.key)
         ndb.delete_multi_async(dislikes_query.fetch(keys_only=True))
 
-        # Delete this item's id from all the seen_items lists of all users.
+        # Delete this item's id from all the seen_item_ids lists of all users.
         users_query = models.User.query(
-            models.User.seen_items == self.item.key.id())
+            models.User.seen_item_ids == self.item.key.id())
         cursor = None
         more = True
         while more:
@@ -94,8 +94,9 @@ class Delete(base.BaseHandler):
                 constants.NUM_USERS_PER_PAGE, start_cusor=cursor)
             for user in users:
                 # Delete the unique occurrence of the item's id in the
-                # seen_items list.
-                del user.seen_items[user.seen_items.index(self.item.key.id())]
+                # seen_item_ids list.
+                item_index = user.seen_item_ids.index(self.item.key.id())
+                del user.seen_item_ids[item_index]
             ndb.put_multi_async(users)
 
         # TODO: When chat is implemented, delete all the chat conversations
@@ -147,7 +148,7 @@ class Get(base.BaseHandler):
 
         # Populate a set containing the ids of all the items that the user has
         # already seen. These will need to be skipped.
-        seen_items = set(self.user.seen_items)
+        seen_item_ids = set(self.user.seen_item_ids)
 
         # This will store dict representations
         returned_results = []
@@ -178,10 +179,7 @@ class Get(base.BaseHandler):
                 cursor = search_response.cursor
                 for document in search_response.results:
                     # Skip items that the user has seen already.
-                    if int(document.doc_id) in seen_items:
-                        continue
-                    # Skip items owned by the user.
-                    if document.field('user_id') == str(self.user.key.id()):
+                    if int(document.doc_id) in seen_item_ids:
                         continue
                     # Create a JSON representation of the item to be returned.
                     item = models.Item.get_by_id(long(document.doc_id))

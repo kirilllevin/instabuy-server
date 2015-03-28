@@ -151,7 +151,7 @@ class BaseHandler(webapp2.RequestHandler):
             return False
 
         # Check that the user owns the item.
-        if self.item.user_id != self.user.key:
+        if self.item.user_key != self.user.key:
             self.populate_error_response(error_codes.USER_PERMISSION_ERROR)
             return False
 

@@ -53,7 +53,7 @@ class PostTest(test_utils.HandlerTest):
         # Check that the item object was created.
         item = models.Item.get_by_id(item_id)
         self.assertIsNotNone(item)
-        self.assertEqual(self.user_key, item.user_id)
+        self.assertEqual(self.user_key, item.user_key)
 
         # Check that the search document was created.
         item_index = search.Index(name=constants.ITEM_INDEX_NAME)
@@ -82,7 +82,7 @@ class GetTest(test_utils.HandlerTest):
 
         # An item that belongs to the current user.
         user_item = models.Item(
-            user_id=ndb.Key(models.User, self.user_key.id()))
+            user_key=ndb.Key(models.User, self.user_key.id()))
         user_item_key = user_item.put()
         fields = [
             search.AtomField(name='user_id', value=str(self.user_key.id())),
@@ -99,7 +99,7 @@ class GetTest(test_utils.HandlerTest):
 
         # Another user's item that this user already liked.
         liked_item = models.Item(
-            user_id=ndb.Key(models.User, self.user_key.id() + 1))
+            user_key=ndb.Key(models.User, self.user_key.id() + 1))
         liked_item_key = liked_item.put()
         fields = [
             search.AtomField(name='user_id', value=str(self.user_key.id() + 1)),
@@ -113,11 +113,11 @@ class GetTest(test_utils.HandlerTest):
                             value=search.GeoPoint(0, 0))]
         item_index.put(
             search.Document(doc_id=str(liked_item_key.id()), fields=fields))
-        like_state = models.LikeState(user_id=self.user_key,
-                                      item_id=liked_item_key,
+        like_state = models.LikeState(user_key=self.user_key,
+                                      item_key=liked_item_key,
                                       like_state=True)
         like_state.put()
-        self.user.seen_items = [liked_item_key.id()]
+        self.user.seen_item_ids = [liked_item_key.id()]
         self.user.put()
 
         # Another user's item that this user hasn't seen. This one also has an
@@ -127,7 +127,7 @@ class GetTest(test_utils.HandlerTest):
         blob_key = blobstore.BlobKey('blob_key')
         image = models.Image(blob_key=blob_key, url='/fake')
         new_item_a = models.Item(
-            user_id=ndb.Key(models.User, self.user_key.id() + 1),
+            user_key=ndb.Key(models.User, self.user_key.id() + 1),
             image=[image])
         new_item_a_key = new_item_a.put()
         fields = [
@@ -150,7 +150,7 @@ class GetTest(test_utils.HandlerTest):
             u'title': u'new_item_a_title',
             u'category': u'category_a',
             u'description': u'new_item_a_description',
-            u'price': 10,
+            u'price': 10.0,
             u'currency': u'currency_a',
             u'image': [unicode(image.url)],
             u'lat': 0,
@@ -159,7 +159,7 @@ class GetTest(test_utils.HandlerTest):
         # Another user's item that this user hasn't seen, but with a
         # different category.
         new_item_b = models.Item(
-            user_id=ndb.Key(models.User, self.user_key.id() + 1))
+            user_key=ndb.Key(models.User, self.user_key.id() + 1))
         new_item_b_key = new_item_b.put()
         fields = [
             search.AtomField(name='user_id', value=str(self.user_key.id() + 1)),
@@ -181,7 +181,7 @@ class GetTest(test_utils.HandlerTest):
             u'title': u'new_item_b_title',
             u'category': u'category_b',
             u'description': u'new_item_b_description',
-            u'price': 10,
+            u'price': 10.0,
             u'currency': u'currency_b',
             u'image': [],
             u'lat': 0,
@@ -312,7 +312,8 @@ class DeleteTest(test_utils.HandlerTest):
 
     def test_delete_wrong_user(self):
         # Set up an item that is owned by a different user.
-        item = models.Item(user_id=ndb.Key(models.User, self.user_key.id() + 1))
+        item = models.Item(
+            user_key=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
         response = app.post('/delete_item',
                             params=json.encode({'item_id': item_key.id()}),
@@ -334,7 +335,7 @@ class DeleteTest(test_utils.HandlerTest):
 
         image = models.Image(blob_key=blob_key, url='/fake')
 
-        item = models.Item(user_id=ndb.Key(models.User, self.user_key.id()),
+        item = models.Item(user_key=self.user_key,
                            image=[image])
         item_key = item.put()
         self.assertIsNotNone(item_key.get())
@@ -353,10 +354,10 @@ class DeleteTest(test_utils.HandlerTest):
         # Set up a second user that has seen this item.
         other_user = models.User(login_type='facebook',
                                  third_party_id='2',
-                                 seen_items=[item_key.id()])
+                                 seen_item_ids=[item_key.id()])
         other_user_key = other_user.put()
-        like_state = models.LikeState(user_id=other_user_key,
-                                      item_id=item_key,
+        like_state = models.LikeState(user_key=other_user_key,
+                                      item_key=item_key,
                                       like_state=False)
         like_state_key = like_state.put()
         self.assertIsNotNone(like_state_key.get())
@@ -368,12 +369,12 @@ class DeleteTest(test_utils.HandlerTest):
                             content_type='application/json')
         self.assertEqual(httplib.OK, response.status_int)
 
-        # Check that the other user's seen_items list no longer has this
+        # Check that the other user's seen_item_ids list no longer has this
         # item's id.
         # We need to refetch other_user because the version we have is a
         # local copy.
         other_user = other_user_key.get()
-        self.assertListEqual([], other_user.seen_items)
+        self.assertListEqual([], other_user.seen_item_ids)
 
         # Check that the associated search document was deleted.
         self.assertIsNone(item_index.get(str(item_key.id())))

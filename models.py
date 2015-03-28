@@ -10,7 +10,7 @@ class User(ndb.Model):
     third_party_id = ndb.StringProperty()
 
     # All the currently-live items that the user has seen.
-    seen_items = ndb.IntegerProperty(repeated=True)
+    seen_item_ids = ndb.IntegerProperty(repeated=True)
 
     # The user's preference for the distance radius when searching for nearby
     # items.
@@ -26,8 +26,8 @@ class Image(ndb.Model):
 
 
 class Item(ndb.Model):
-    # The user ID that owns this item.
-    user_id = ndb.KeyProperty(User, indexed=True)
+    # The key for the user that owns this item.
+    user_key = ndb.KeyProperty(User, indexed=True)
 
     # The time/date that this item was created.
     create_date = ndb.DateTimeProperty(auto_now_add=True, indexed=True)
@@ -41,10 +41,10 @@ class Item(ndb.Model):
 
 class LikeState(ndb.Model):
     # The user that liked/disliked the item.
-    user_id = ndb.KeyProperty(User, indexed=True)
+    user_key = ndb.KeyProperty(User, indexed=True)
 
     # The item that is liked/disliked.
-    item_id = ndb.KeyProperty(Item, indexed=True)
+    item_key = ndb.KeyProperty(Item, indexed=True)
 
     # Whether or not this is a like or dislike.
     like_state = ndb.BooleanProperty(indexed=True)
