@@ -12,7 +12,7 @@ class GetUploadUrl(base.BaseHandler):
     @ndb.toplevel
     def get(self):
         self.populate_success_response(
-            {'upload_url': blobstore.create_upload_url('/upload_image')})
+            {'upload_url': blobstore.create_upload_url('/item/image/upload')})
 
 
 class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
