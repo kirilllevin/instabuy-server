@@ -1,6 +1,8 @@
 from google.appengine.ext import ndb
 import unittest
+import webtest
 
+import main
 import models
 import user_utils
 
@@ -16,6 +18,8 @@ class HandlerTest(unittest.TestCase):
         'X-Auth-Token': '1',
         'Content-Type': 'application/json'
     }
+
+    app = webtest.TestApp(main.app)
 
     def setUp(self):
         self.original_get_facebook_user_id = user_utils.get_facebook_user_id

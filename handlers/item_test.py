@@ -3,15 +3,11 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 import httplib
 from webapp2_extras import json
-import webtest
 
 import constants
 import error_codes
-import main
 import models
 import test_utils
-
-app = webtest.TestApp(main.app)
 
 
 class PostTest(test_utils.HandlerTest):
@@ -28,19 +24,21 @@ class PostTest(test_utils.HandlerTest):
     def test_post_invalid_latlng(self):
         params = self.params.copy()
         params['lat'] = 900
-        response = app.post('/item/post',
-                            params=json.encode(params),
-                            headers=self.headers,
-                            expect_errors=True)
+        response = self.app.post(
+            '/item/post',
+            params=json.encode(params),
+            headers=self.headers,
+            expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
         self.assertEqual(error_codes.MALFORMED_REQUEST.code,
                          response_body['error']['error_code'])
 
     def test_post_simple(self):
-        response = app.post('/item/post',
-                            params=json.encode(self.params),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/post',
+            params=json.encode(self.params),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         response_body = json.decode(response.body)
         item_id = long(response_body['item_id'])
@@ -184,9 +182,10 @@ class ListTest(test_utils.HandlerTest):
             self.assertDictEqual(sorted_expected[i], sorted_actual[i])
 
     def test_get_by_distance(self):
-        response = app.get('/item/list',
-                           params={'lat': 0, 'lng': 0},
-                           headers=self.headers)
+        response = self.app.get(
+            '/item/list',
+            params={'lat': 0, 'lng': 0},
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -196,9 +195,10 @@ class ListTest(test_utils.HandlerTest):
             [self.result_item_a, self.result_item_b], results)
 
     def test_distance_too_far(self):
-        response = app.get('/item/list',
-                           params={'lat': 0, 'lng': 180},
-                           headers=self.headers)
+        response = self.app.get(
+            '/item/list',
+            params={'lat': 0, 'lng': 180},
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -207,10 +207,11 @@ class ListTest(test_utils.HandlerTest):
         self.assertEqual(0, len(results))
 
     def test_get_by_category(self):
-        response = app.get('/item/list',
-                           params={'lat': 0, 'lng': 0,
-                                   'category': 'category_a'},
-                           headers=self.headers)
+        response = self.app.get(
+            '/item/list',
+            params={'lat': 0, 'lng': 0,
+                    'category': 'category_a'},
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -218,10 +219,11 @@ class ListTest(test_utils.HandlerTest):
         self.compare_lists_of_dicts_ignore_order([self.result_item_a], results)
 
     def test_get_by_search(self):
-        response = app.get('/item/list',
-                           params={'lat': 0, 'lng': 0,
-                                   'search_query': 'new_item_b_description'},
-                           headers=self.headers)
+        response = self.app.get(
+            '/item/list',
+            params={'lat': 0, 'lng': 0,
+                    'search_query': 'new_item_b_description'},
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -235,9 +237,10 @@ class ListTest(test_utils.HandlerTest):
         constants.NUM_ITEMS_PER_PAGE = 1
 
         try:
-            response = app.get('/item/list',
-                               params={'lat': 0, 'lng': 0},
-                               headers=self.headers)
+            response = self.app.get(
+                '/item/list',
+                params={'lat': 0, 'lng': 0},
+                headers=self.headers)
             self.assertEqual(httplib.OK, response.status_int)
             json_body = json.decode(response.body)
 
@@ -252,10 +255,11 @@ class ListTest(test_utils.HandlerTest):
                                              self.result_item_b])
 
             # Now ask for more items, passing in the cursor.
-            response = app.get('/item/list',
-                               params={'lat': 0, 'lng': 0,
-                                       'cursor': json_body['cursor']},
-                               headers=self.headers)
+            response = self.app.get(
+                '/item/list',
+                params={'lat': 0, 'lng': 0,
+                        'cursor': json_body['cursor']},
+                headers=self.headers)
             self.assertEqual(httplib.OK, response.status_int)
             json_body = json.decode(response.body)
 
@@ -283,10 +287,11 @@ class DeleteTest(test_utils.HandlerTest):
         self.assertIsNone(ndb.Key(models.Item, 7).get())
 
         # Now try to delete it.
-        response = app.post('/item/delete',
-                            params=json.encode({'item_id': 7}),
-                            headers=self.headers,
-                            expect_errors=True)
+        response = self.app.post(
+            '/item/delete',
+            params=json.encode({'item_id': 7}),
+            headers=self.headers,
+            expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
         self.assertEqual(error_codes.INVALID_ITEM.code,
@@ -297,10 +302,11 @@ class DeleteTest(test_utils.HandlerTest):
         item = models.Item(
             user_key=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
-        response = app.post('/item/delete',
-                            params=json.encode({'item_id': item_key.id()}),
-                            headers=self.headers,
-                            expect_errors=True)
+        response = self.app.post(
+            '/item/delete',
+            params=json.encode({'item_id': item_key.id()}),
+            headers=self.headers,
+            expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
         self.assertEqual(error_codes.USER_PERMISSION_ERROR.code,
@@ -344,9 +350,10 @@ class DeleteTest(test_utils.HandlerTest):
         self.assertIsNotNone(like_state_key.get())
 
         # Delete the item.
-        response = app.post('/item/delete',
-                            params=json.encode({'item_id': item_key.id()}),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/delete',
+            params=json.encode({'item_id': item_key.id()}),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_item_ids list no longer has this

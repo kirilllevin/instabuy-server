@@ -1,13 +1,9 @@
 from google.appengine.ext import ndb
 import httplib
 from webapp2_extras import json
-import webtest
 
-import main
 import models
 import test_utils
-
-app = webtest.TestApp(main.app)
 
 
 class PostTest(test_utils.HandlerTest):
@@ -27,10 +23,11 @@ class PostTest(test_utils.HandlerTest):
     def test_add_like(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/item/like',
-                            params=json.encode({'item_id': self.item_key.id(),
-                                                'like_state': 1}),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/like',
+            params=json.encode({'item_id': self.item_key.id(),
+                                'like_state': 1}),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -43,10 +40,11 @@ class PostTest(test_utils.HandlerTest):
     def test_add_dislike(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/item/like',
-                            params=json.encode({'item_id': self.item_key.id(),
-                                                'like_state': 0}),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/like',
+            params=json.encode({'item_id': self.item_key.id(),
+                                'like_state': 0}),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -59,10 +57,11 @@ class PostTest(test_utils.HandlerTest):
     def test_update(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/item/like',
-                            params=json.encode({'item_id': self.item_key.id(),
-                                                'like_state': 1}),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/like',
+            params=json.encode({'item_id': self.item_key.id(),
+                                'like_state': 1}),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -73,10 +72,11 @@ class PostTest(test_utils.HandlerTest):
         self.user = self.user_key.get()
         self.assertListEqual([self.item_key.id()], self.user.seen_item_ids)
 
-        response = app.post('/item/like',
-                            params=json.encode({'item_id': self.item_key.id(),
-                                                'like_state': 0}),
-                            headers=self.headers)
+        response = self.app.post(
+            '/item/like',
+            params=json.encode({'item_id': self.item_key.id(),
+                                'like_state': 0}),
+            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
