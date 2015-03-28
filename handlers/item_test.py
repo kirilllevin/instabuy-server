@@ -345,9 +345,16 @@ class DeleteTest(test_utils.HandlerTest):
         other_user_key = other_user.put()
         like_state = models.LikeState(user_key=other_user_key,
                                       item_key=item_key,
-                                      like_state=False)
+                                      like_state=True)
         like_state_key = like_state.put()
         self.assertIsNotNone(like_state_key.get())
+
+        # Set up a chat conversation between other_user and the test user
+        # about this item.
+        conversation = models.Conversation(item_key=item_key,
+                                           buyer_key=other_user_key)
+        conversation_key = conversation.put()
+        self.assertIsNotNone(conversation_key.get())
 
         # Delete the item.
         response = self.app.post(
@@ -371,6 +378,9 @@ class DeleteTest(test_utils.HandlerTest):
 
         # Check that the like state was deleted.
         self.assertIsNone(like_state_key.get())
+
+        # Check that the conversation was deleted.
+        self.assertIsNone(conversation_key.get())
 
         # Check that the item itself was deleted.
         self.assertIsNone(item_key.get())

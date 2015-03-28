@@ -27,6 +27,9 @@ routes = [
     # Retrieving items for display to users.
     Route(r'/item/list', handler='handlers.item.List', name='list'),
 
+    # Chatting.
+    Route(r'/chat/post', handler='handlers.conversation.Post', name='post'),
+
     # Administrative, for development.
     Route(r'/clear_all', handler='handlers.handlers.ClearAllEntry',
           name='clear_all')

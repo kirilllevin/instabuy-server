@@ -98,8 +98,14 @@ class Delete(base.BaseHandler):
                 del user.seen_item_ids[item_index]
             ndb.put_multi_async(users)
 
-        # TODO: When chat is implemented, delete all the chat conversations
-        # associated to this item as well.
+        # Delete all the conversations associated to this item.
+        conversations_query = models.Conversation.query(
+            models.Conversation.item_key == self.item.key)
+        ndb.delete_multi_async(conversations_query.fetch(keys_only=True))
+
+        # TODO: When push notifications are implemented, send a notification
+        #       here to all the clients of buyers for this item, so they delete
+        #       the conversation on their end.
 
         # Delete all the image data associated to this item.
         blobstore_future = blobstore.delete_async(

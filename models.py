@@ -51,3 +51,29 @@ class LikeState(ndb.Model):
 
     # Whether or not this is a like or dislike.
     like_state = ndb.BooleanProperty(indexed=True)
+
+
+class Message(ndb.Model):
+    # The key for the user that sent this message.
+    user_key = ndb.KeyProperty(User, indexed=True)
+
+    # The name of the user, which is taken from the 'name' field in the User
+    # object. This is stored here for denormalization.
+    user_name = ndb.StringProperty(indexed=False)
+
+    # The contents of the message.
+    message = ndb.TextProperty()
+
+    # The time/date that this message was created.
+    create_date = ndb.DateTimeProperty(auto_now_add=True, indexed=True)
+
+
+class Conversation(ndb.Model):
+    # The key for the item this conversation corresponds to.
+    item_key = ndb.KeyProperty(Item, indexed=True)
+
+    # The key for the user that wants to buy the item.
+    buyer_key = ndb.KeyProperty(User, indexed=True)
+
+    # The ordered list of messages in this conversation.
+    messages = ndb.StructuredProperty(Message, repeated=True, indexed=False)
