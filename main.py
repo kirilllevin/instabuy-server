@@ -12,22 +12,20 @@ routes = [
     Route(r'/user/update', handler='handlers.user.Update', name='update'),
 
     # Item creation.
-    Route(r'/post_item', handler='handlers.item.Post', name='post_item'),
-    Route(r'/get_image_upload_url', handler='handlers.image.GetUploadUrl',
-          name='get_image_upload_url'),
-    Route(r'/upload_image', handler='handlers.image.Upload',
-          name='upload_image'),
+    Route(r'/item/post', handler='handlers.item.Post', name='post'),
+    Route(r'/item/image/upload_url', handler='handlers.image.GetUploadUrl',
+          name='upload_url'),
+    Route(r'/item/image/upload', handler='handlers.image.Upload',
+          name='upload'),
 
     # Item deletion.
-    Route(r'/delete_item',
-          handler='handlers.item.Delete', name='delete_item'),
+    Route(r'/item/delete', handler='handlers.item.Delete', name='delete'),
 
     # Liking and disliking of items.
-    Route(r'/update_item_like_state', handler='handlers.like_state.Post',
-          name='update_item_like_state'),
+    Route(r'/item/like', handler='handlers.like_state.Post', name='like'),
 
     # Retrieving items for display to users.
-    Route(r'/get_items', handler='handlers.item.Get', name='get_items'),
+    Route(r'/item/list', handler='handlers.item.List', name='list'),
 
     # Administrative, for development.
     Route(r'/clear_all', handler='handlers.handlers.ClearAllEntry',

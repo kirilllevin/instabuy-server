@@ -29,7 +29,7 @@ class PostTest(test_utils.HandlerTest):
     def test_add_like(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/update_item_like_state',
+        response = app.post('/item/like',
                             params=json.encode({'item_id': self.item_key.id(),
                                                 'like_state': 1}),
                             headers=self.headers)
@@ -45,7 +45,7 @@ class PostTest(test_utils.HandlerTest):
     def test_add_dislike(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/update_item_like_state',
+        response = app.post('/item/like',
                             params=json.encode({'item_id': self.item_key.id(),
                                                 'like_state': 0}),
                             headers=self.headers)
@@ -61,7 +61,7 @@ class PostTest(test_utils.HandlerTest):
     def test_update(self):
         self.assertListEqual([], self.user.seen_item_ids)
 
-        response = app.post('/update_item_like_state',
+        response = app.post('/item/like',
                             params=json.encode({'item_id': self.item_key.id(),
                                                 'like_state': 1}),
                             headers=self.headers)
@@ -75,7 +75,7 @@ class PostTest(test_utils.HandlerTest):
         self.user = self.user_key.get()
         self.assertListEqual([self.item_key.id()], self.user.seen_item_ids)
 
-        response = app.post('/update_item_like_state',
+        response = app.post('/item/like',
                             params=json.encode({'item_id': self.item_key.id(),
                                                 'like_state': 0}),
                             headers=self.headers)

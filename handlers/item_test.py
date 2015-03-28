@@ -31,7 +31,7 @@ class PostTest(test_utils.HandlerTest):
     def test_post_invalid_latlng(self):
         params = self.params.copy()
         params['lat'] = 900
-        response = app.post('/post_item',
+        response = app.post('/item/post',
                             params=json.encode(params),
                             headers=self.headers,
                             expect_errors=True)
@@ -41,7 +41,7 @@ class PostTest(test_utils.HandlerTest):
                          response_body['error']['error_code'])
 
     def test_post_simple(self):
-        response = app.post('/post_item',
+        response = app.post('/item/post',
                             params=json.encode(self.params),
                             headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
@@ -65,7 +65,7 @@ class PostTest(test_utils.HandlerTest):
         self.assertEqual(search.GeoPoint(0, 0), doc.field('location').value)
 
 
-class GetTest(test_utils.HandlerTest):
+class ListTest(test_utils.HandlerTest):
     # Enable the relevant stubs.
     nosegae_blobstore = True
     nosegae_datastore_v3 = True
@@ -73,7 +73,7 @@ class GetTest(test_utils.HandlerTest):
     nosegae_search = True
 
     def setUp(self):
-        super(GetTest, self).setUp()
+        super(ListTest, self).setUp()
         self.maxDiff = None
 
         item_index = search.Index(name=constants.ITEM_INDEX_NAME)
@@ -193,7 +193,7 @@ class GetTest(test_utils.HandlerTest):
             self.assertDictEqual(sorted_expected[i], sorted_actual[i])
 
     def test_get_by_distance(self):
-        response = app.get('/get_items',
+        response = app.get('/item/list',
                            params={'lat': 0, 'lng': 0},
                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
@@ -205,7 +205,7 @@ class GetTest(test_utils.HandlerTest):
             [self.result_item_a, self.result_item_b], results)
 
     def test_distance_too_far(self):
-        response = app.get('/get_items',
+        response = app.get('/item/list',
                            params={'lat': 0, 'lng': 180},
                            headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)
@@ -216,7 +216,7 @@ class GetTest(test_utils.HandlerTest):
         self.assertEqual(0, len(results))
 
     def test_get_by_category(self):
-        response = app.get('/get_items',
+        response = app.get('/item/list',
                            params={'lat': 0, 'lng': 0,
                                    'category': 'category_a'},
                            headers=self.headers)
@@ -227,7 +227,7 @@ class GetTest(test_utils.HandlerTest):
         self.compare_lists_of_dicts_ignore_order([self.result_item_a], results)
 
     def test_get_by_search(self):
-        response = app.get('/get_items',
+        response = app.get('/item/list',
                            params={'lat': 0, 'lng': 0,
                                    'search_query': 'new_item_b_description'},
                            headers=self.headers)
@@ -244,7 +244,7 @@ class GetTest(test_utils.HandlerTest):
         constants.NUM_ITEMS_PER_PAGE = 1
 
         try:
-            response = app.get('/get_items',
+            response = app.get('/item/list',
                                params={'lat': 0, 'lng': 0},
                                headers=self.headers)
             self.assertEqual(httplib.OK, response.status_int)
@@ -261,7 +261,7 @@ class GetTest(test_utils.HandlerTest):
                                              self.result_item_b])
 
             # Now ask for more items, passing in the cursor.
-            response = app.get('/get_items',
+            response = app.get('/item/list',
                                params={'lat': 0, 'lng': 0,
                                        'cursor': json_body['cursor']},
                                headers=self.headers)
@@ -298,7 +298,7 @@ class DeleteTest(test_utils.HandlerTest):
         self.assertIsNone(ndb.Key(models.Item, 7).get())
 
         # Now try to delete it.
-        response = app.post('/delete_item',
+        response = app.post('/item/delete',
                             params=json.encode({'item_id': 7}),
                             headers=self.headers,
                             expect_errors=True)
@@ -312,7 +312,7 @@ class DeleteTest(test_utils.HandlerTest):
         item = models.Item(
             user_key=ndb.Key(models.User, self.user_key.id() + 1))
         item_key = item.put()
-        response = app.post('/delete_item',
+        response = app.post('/item/delete',
                             params=json.encode({'item_id': item_key.id()}),
                             headers=self.headers,
                             expect_errors=True)
@@ -359,7 +359,7 @@ class DeleteTest(test_utils.HandlerTest):
         self.assertIsNotNone(like_state_key.get())
 
         # Delete the item.
-        response = app.post('/delete_item',
+        response = app.post('/item/delete',
                             params=json.encode({'item_id': item_key.id()}),
                             headers=self.headers)
         self.assertEqual(httplib.OK, response.status_int)

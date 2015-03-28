@@ -126,7 +126,7 @@ class Delete(base.BaseHandler):
         self.populate_success_response()
 
 
-class Get(base.BaseHandler):
+class List(base.BaseHandler):
     @ndb.toplevel
     def get(self):
         success = self.parse_request(
