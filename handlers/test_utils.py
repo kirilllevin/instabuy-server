@@ -19,7 +19,10 @@ class HandlerTest(unittest.TestCase):
             return str(fb_access_token)
         user_utils.get_facebook_user_id = mock_get_facebook_user_id
 
-        self.user = models.User(login_type='facebook', third_party_id='1')
+        self.user = models.User(login_type='facebook',
+                                third_party_id='1',
+                                name='test_name',
+                                distance_radius_km=10)
         self.user_key = self.user.put()
 
     def tearDown(self):

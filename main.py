@@ -8,7 +8,8 @@ DEBUG = os.environ.get('SERVER_SOFTWARE', '').startswith('Dev')
 
 routes = [
     # User registration.
-    Route(r'/register', handler='handlers.user.Register', name='register'),
+    Route(r'/user/register', handler='handlers.user.Register', name='register'),
+    Route(r'/user/update', handler='handlers.user.Update', name='update'),
 
     # Item creation.
     Route(r'/post_item', handler='handlers.item.Post', name='post_item'),

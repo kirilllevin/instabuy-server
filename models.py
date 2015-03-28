@@ -12,6 +12,9 @@ class User(ndb.Model):
     # All the currently-live items that the user has seen.
     seen_item_ids = ndb.IntegerProperty(repeated=True)
 
+    # The user's name, as displayed in chat messages.
+    name = ndb.StringProperty(indexed=False)
+
     # The user's preference for the distance radius when searching for nearby
     # items.
     distance_radius_km = ndb.IntegerProperty(default=10, indexed=False)
