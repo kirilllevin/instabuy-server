@@ -27,7 +27,7 @@ class PostTest(test_utils.HandlerTest):
             '/item/like',
             params=json.encode({'item_id': self.item_key.id(),
                                 'like_state': 1}),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -44,7 +44,7 @@ class PostTest(test_utils.HandlerTest):
             '/item/like',
             params=json.encode({'item_id': self.item_key.id(),
                                 'like_state': 0}),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -61,7 +61,7 @@ class PostTest(test_utils.HandlerTest):
             '/item/like',
             params=json.encode({'item_id': self.item_key.id(),
                                 'like_state': 1}),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)
@@ -76,7 +76,7 @@ class PostTest(test_utils.HandlerTest):
             '/item/like',
             params=json.encode({'item_id': self.item_key.id(),
                                 'like_state': 0}),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         like_state = self.get_like_state()
         self.assertIsNotNone(like_state)

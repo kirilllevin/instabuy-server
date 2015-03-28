@@ -7,11 +7,6 @@ import test_utils
 
 
 class RegisterTest(test_utils.HandlerTest):
-    headers = {
-        'X-Auth-Token': '2',
-        'Content-Type': 'application/json'
-    }
-
     def test_new_user(self):
         # At first, there should be no account.
         user = models.User.query(models.User.third_party_id == '2').get()
@@ -22,7 +17,7 @@ class RegisterTest(test_utils.HandlerTest):
             '/user/register',
             params=json.encode({'name': 'fake_name',
                                 'distance_radius_km': 20}),
-            headers=self.headers)
+            headers=self.headers_for_user(2))
         self.assertEqual(httplib.OK, response.status_int)
 
         # Now check that a User object was indeed created.
@@ -36,14 +31,14 @@ class RegisterTest(test_utils.HandlerTest):
         response = self.app.post(
             '/user/register',
             params=json.encode({'name': 'fake_name'}),
-            headers=self.headers)
+            headers=self.headers_for_user(2))
         self.assertEqual(httplib.OK, response.status_int)
 
         # Registering a second time should give errors.
         response = self.app.post(
             '/user/register',
             params=json.encode({'name': 'fake_name2'}),
-            headers=self.headers,
+            headers=self.headers_for_user(2),
             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -53,13 +48,11 @@ class RegisterTest(test_utils.HandlerTest):
 
 class UpdateTest(test_utils.HandlerTest):
     def test_update_nonexisting_user(self):
-        headers = self.headers
-        headers['X-Auth-Token'] = '2'
         response = self.app.post(
             '/user/update',
             params=json.encode({'name': 'changed_name',
                                 'distance_radius_km': 100}),
-            headers=headers,
+            headers=self.headers_for_user(2),
             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -73,7 +66,7 @@ class UpdateTest(test_utils.HandlerTest):
             '/user/update',
             params=json.encode({'name': 'changed_name',
                                 'distance_radius_km': 100}),
-            headers=self.headers,
+            headers=self.headers_for_user(self.user.third_party_id),
             expect_errors=True)
         self.assertEqual(httplib.OK, response.status_int)
         self.user = self.user_key.get()

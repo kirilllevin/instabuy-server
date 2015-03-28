@@ -14,11 +14,6 @@ class HandlerTest(unittest.TestCase):
     nosegae_images = True
     nosegae_search = True
 
-    headers = {
-        'X-Auth-Token': '1',
-        'Content-Type': 'application/json'
-    }
-
     app = webtest.TestApp(main.app)
 
     def setUp(self):
@@ -42,3 +37,9 @@ class HandlerTest(unittest.TestCase):
         ndb.delete_multi(models.Image().query().fetch(keys_only=True))
 
         user_utils.get_facebook_user_id = self.original_get_facebook_user_id
+
+    def headers_for_user(self, user_id):
+        return {
+            'X-Auth-Token': str(user_id),
+            'Content-Type': 'application/json'
+        }

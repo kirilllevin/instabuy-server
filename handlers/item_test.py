@@ -27,7 +27,7 @@ class PostTest(test_utils.HandlerTest):
         response = self.app.post(
             '/item/post',
             params=json.encode(params),
-            headers=self.headers,
+            headers=self.headers_for_user(self.user.third_party_id),
             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -38,7 +38,7 @@ class PostTest(test_utils.HandlerTest):
         response = self.app.post(
             '/item/post',
             params=json.encode(self.params),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         response_body = json.decode(response.body)
         item_id = long(response_body['item_id'])
@@ -185,7 +185,7 @@ class ListTest(test_utils.HandlerTest):
         response = self.app.get(
             '/item/list',
             params={'lat': 0, 'lng': 0},
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -198,7 +198,7 @@ class ListTest(test_utils.HandlerTest):
         response = self.app.get(
             '/item/list',
             params={'lat': 0, 'lng': 180},
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -211,7 +211,7 @@ class ListTest(test_utils.HandlerTest):
             '/item/list',
             params={'lat': 0, 'lng': 0,
                     'category': 'category_a'},
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -223,7 +223,7 @@ class ListTest(test_utils.HandlerTest):
             '/item/list',
             params={'lat': 0, 'lng': 0,
                     'search_query': 'new_item_b_description'},
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
         results = json.decode(response.body)['results']
 
@@ -240,7 +240,7 @@ class ListTest(test_utils.HandlerTest):
             response = self.app.get(
                 '/item/list',
                 params={'lat': 0, 'lng': 0},
-                headers=self.headers)
+                headers=self.headers_for_user(self.user.third_party_id))
             self.assertEqual(httplib.OK, response.status_int)
             json_body = json.decode(response.body)
 
@@ -259,7 +259,7 @@ class ListTest(test_utils.HandlerTest):
                 '/item/list',
                 params={'lat': 0, 'lng': 0,
                         'cursor': json_body['cursor']},
-                headers=self.headers)
+                headers=self.headers_for_user(self.user.third_party_id))
             self.assertEqual(httplib.OK, response.status_int)
             json_body = json.decode(response.body)
 
@@ -290,7 +290,7 @@ class DeleteTest(test_utils.HandlerTest):
         response = self.app.post(
             '/item/delete',
             params=json.encode({'item_id': 7}),
-            headers=self.headers,
+            headers=self.headers_for_user(self.user.third_party_id),
             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -305,7 +305,7 @@ class DeleteTest(test_utils.HandlerTest):
         response = self.app.post(
             '/item/delete',
             params=json.encode({'item_id': item_key.id()}),
-            headers=self.headers,
+            headers=self.headers_for_user(self.user.third_party_id),
             expect_errors=True)
         self.assertEqual(httplib.BAD_REQUEST, response.status_int)
         response_body = json.decode(response.body)
@@ -353,7 +353,7 @@ class DeleteTest(test_utils.HandlerTest):
         response = self.app.post(
             '/item/delete',
             params=json.encode({'item_id': item_key.id()}),
-            headers=self.headers)
+            headers=self.headers_for_user(self.user.third_party_id))
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_item_ids list no longer has this
