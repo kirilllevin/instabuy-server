@@ -4,7 +4,6 @@ from google.appengine.api import images
 from google.appengine.api import search
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
-from webapp2_extras import json
 
 import constants
 import error_codes

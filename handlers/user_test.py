@@ -15,7 +15,8 @@ class RegisterTest(test_utils.HandlerTest):
     nosegae_datastore_v3 = True
 
     headers = {
-        'X-Auth-Token': '2'
+        'X-Auth-Token': '2',
+        'Content-Type': 'application/json'
     }
 
     def test_new_user(self):

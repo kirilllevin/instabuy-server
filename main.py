@@ -22,7 +22,7 @@ routes = [
           handler='handlers.item.Delete', name='delete_item'),
 
     # Liking and disliking of items.
-    Route(r'/update_item_like_state', handler='handlers.like_state.Update',
+    Route(r'/update_item_like_state', handler='handlers.like_state.Post',
           name='update_item_like_state'),
 
     # Retrieving items for display to users.

@@ -5,7 +5,7 @@ import base
 import models
 
 
-class Update(base.BaseHandler):
+class Post(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
@@ -31,7 +31,7 @@ class Update(base.BaseHandler):
             item_like_state.like_state = bool(self.args['like_state'])
         else:
             item_like_state = models.LikeState(
-                parent=self.item.key,
+                item_key=self.item.key,
                 user_key=self.user.key,
                 like_state=bool(self.args['like_state']))
             # Mark that the user has now seen this item.
