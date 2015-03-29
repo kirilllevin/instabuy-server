@@ -9,6 +9,9 @@ NUM_ITEMS_PER_PAGE = 50
 # when iterating over the users.
 NUM_USERS_PER_PAGE = 300
 
+# The maximum number of items that can be queried at one time.
+MAX_ITEMS = 50
+
 # Types of retrievals for GetItems.
 RETRIEVAL_SEARCH = 'search'
 RETRIEVAL_CATEGORY = 'category'

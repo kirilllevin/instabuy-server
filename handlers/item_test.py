@@ -356,6 +356,10 @@ class DeleteTest(test_utils.HandlerTest):
         conversation_key = conversation.put()
         self.assertIsNotNone(conversation_key.get())
 
+        # Add the conversation to the list of the other user's conversations.
+        other_user.ongoing_conversations = [conversation_key.id()]
+        other_user.put()
+
         # Delete the item.
         response = self.app.post(
             '/item/delete',
@@ -364,11 +368,13 @@ class DeleteTest(test_utils.HandlerTest):
         self.assertEqual(httplib.OK, response.status_int)
 
         # Check that the other user's seen_item_ids list no longer has this
-        # item's id.
+        # item's id, and their ongoing_conversations list doesn't have the
+        # associated conversation either.
         # We need to refetch other_user because the version we have is a
         # local copy.
         other_user = other_user_key.get()
         self.assertListEqual([], other_user.seen_item_ids)
+        self.assertListEqual([], other_user.ongoing_conversations)
 
         # Check that the associated search document was deleted.
         self.assertIsNone(item_index.get(str(item_key.id())))

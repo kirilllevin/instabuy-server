@@ -47,6 +47,7 @@ class Post(base.BaseHandler):
         # If there is no conversation, double check that the sender is the
         # buyer, to ensure that sellers can't spam people.
         # Also check that the sender liked the item.
+        added_new_conversation = False
         if not conversation:
             if buyer_key != self.user.key:
                 self.populate_error_response(error_codes.MALFORMED_REQUEST)
@@ -68,12 +69,22 @@ class Post(base.BaseHandler):
             # Finally, it's safe to create the conversation.
             conversation = models.Conversation(item_key=self.item.key,
                                                buyer_key=buyer_key)
+            added_new_conversation = True
+
         # Create the message and append it to the end of the conversation.
         message = models.Message(user_key=self.user.key,
                                  user_name=self.user.name,
                                  message=self.args['message'])
         conversation.messages.append(message)
-        conversation.put_async()
+        conversation_key = conversation.put()
+
+        if added_new_conversation:
+            # This only happens when the current user is the buyer,
+            # so we need to also refetch and update the seller.
+            self.user.ongoing_conversations.append(conversation_key.id())
+            other_user = receiver_key.get()
+            other_user.ongoing_conversations.append(conversation_key.id())
+            ndb.put_multi_async([self.user, other_user])
 
         # TODO: Push the message to the receiver here.
 

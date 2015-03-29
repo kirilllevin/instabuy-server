@@ -9,15 +9,21 @@ class User(ndb.Model):
     # login_type value, these must be unique.
     third_party_id = ndb.StringProperty()
 
-    # All the currently-live items that the user has seen.
-    seen_item_ids = ndb.IntegerProperty(repeated=True)
-
     # The user's name, as displayed in chat messages.
     name = ndb.StringProperty(indexed=False)
 
     # The user's preference for the distance radius when searching for nearby
     # items.
     distance_radius_km = ndb.IntegerProperty(default=10, indexed=False)
+
+    # All the currently-live items that the user has seen.
+    seen_item_ids = ndb.IntegerProperty(repeated=True)
+
+    # All the ongoing conversations that this user is part of.
+    ongoing_conversations = ndb.IntegerProperty(repeated=True)
+
+    # The last time this user pinged for status.
+    last_active = ndb.DateTimeProperty(indexed=False)
 
 
 class Image(ndb.Model):
@@ -77,3 +83,6 @@ class Conversation(ndb.Model):
 
     # The ordered list of messages in this conversation.
     messages = ndb.StructuredProperty(Message, repeated=True, indexed=False)
+
+    # The last time anything happened in this conversation.
+    last_activity_date = ndb.DateTimeProperty(auto_now=True, indexed=False)

@@ -83,6 +83,12 @@ class Delete(base.BaseHandler):
             models.LikeState.item_key == self.item.key)
         ndb.delete_multi_async(dislikes_query.fetch(keys_only=True))
 
+        # Delete all the conversations associated to this item.
+        conversation_keys = models.Conversation.query(
+            models.Conversation.item_key == self.item.key).fetch(keys_only=True)
+        ndb.delete_multi_async(conversation_keys)
+        conversation_ids = set([key.id() for key in conversation_keys])
+
         # Delete this item's id from all the seen_item_ids lists of all users.
         users_query = models.User.query(
             models.User.seen_item_ids == self.item.key.id())
@@ -94,14 +100,14 @@ class Delete(base.BaseHandler):
             for user in users:
                 # Delete the unique occurrence of the item's id in the
                 # seen_item_ids list.
-                item_index = user.seen_item_ids.index(self.item.key.id())
-                del user.seen_item_ids[item_index]
+                seen_item_index = user.seen_item_ids.index(self.item.key.id())
+                del user.seen_item_ids[seen_item_index]
+                # Delete all (really at most 1) conversation ids that
+                # correspond to conversations this user has about this item.
+                user.ongoing_conversations = \
+                    [i for i in user.ongoing_conversations if i not in
+                     conversation_ids]
             ndb.put_multi_async(users)
-
-        # Delete all the conversations associated to this item.
-        conversations_query = models.Conversation.query(
-            models.Conversation.item_key == self.item.key)
-        ndb.delete_multi_async(conversations_query.fetch(keys_only=True))
 
         # TODO: When push notifications are implemented, send a notification
         #       here to all the clients of buyers for this item, so they delete

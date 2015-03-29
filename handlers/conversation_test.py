@@ -141,6 +141,16 @@ class PostTest(test_utils.HandlerTest):
         self.assertEqual('test_message', message.message)
         self.assertEqual('test_name', message.user_name)
 
+        # Check that both the test user and second_user now have the
+        # conversation in their lists of ongoing conversations.
+        # We need to refetch both user objects, since they were updated.
+        self.user = self.user.key.get()
+        self.second_user = self.second_user.key.get()
+        self.assertListEqual([conversation.key.id()],
+                             self.user.ongoing_conversations)
+        self.assertListEqual([conversation.key.id()],
+                             self.second_user.ongoing_conversations)
+
     def test_seller_response(self):
         # Test user sends a message to second_user about the item.
         response = self.app.post(

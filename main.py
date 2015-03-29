@@ -30,6 +30,9 @@ routes = [
     # Chatting.
     Route(r'/chat/post', handler='handlers.conversation.Post', name='post'),
 
+    # Polling for updates.
+    Route(r'/updates', handler='handlers.updates.List', name='updates'),
+
     # Administrative, for development.
     Route(r'/clear_all', handler='handlers.handlers.ClearAllEntry',
           name='clear_all')

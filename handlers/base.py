@@ -37,7 +37,7 @@ class BaseHandler(webapp2.RequestHandler):
             args_dict = json.decode(self.request.body)
         else:
             return False
-        num_args = 0
+        seen_args = set()
         try:
             for arg_name, type_tuple in allowed_args.iteritems():
                 t, required, validate = type_tuple
@@ -47,16 +47,21 @@ class BaseHandler(webapp2.RequestHandler):
                     else:
                         continue
                 # Try casting the value to the given type.
-                value = t(args_dict[arg_name])
+                if self.request.method == 'GET' and t is list:
+                    value = args_dict.getall(arg_name)
+                else:
+                    value = t(args_dict[arg_name])
                 # Run the validation function if it's present.
                 if validate and not validate(value):
                     return False
                 self.args[arg_name] = value
-                num_args += 1
+                seen_args.add(arg_name)
         except ValueError:
             return False
         # Final check to ensure that no additional params were supplied.
-        return num_args == len(args_dict)
+        # args_dict might be a MultiDict, so we need to collapse its keys to a
+        # set.
+        return len(seen_args) == len(set(args_dict.keys()))
 
     def populate_error_response(self, error_code, message=None):
         self.response.status_int = httplib.BAD_REQUEST
