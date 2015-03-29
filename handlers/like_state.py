@@ -21,6 +21,8 @@ class Post(base.BaseHandler):
         if not self.populate_item(self.args['item_id']):
             return
 
+        entities_to_update = []
+
         # Check if we already recorded a like state for this user, item pair.
         # If it exists, simply update it, otherwise store a new one.
         query = models.LikeState.query(
@@ -36,8 +38,9 @@ class Post(base.BaseHandler):
                 like_state=bool(self.args['like_state']))
             # Mark that the user has now seen this item.
             self.user.seen_item_ids.append(self.item.key.id())
-            self.user.put_async()
-        item_like_state.put_async()
+            entities_to_update.append(self.user)
+        entities_to_update.append(item_like_state)
+        ndb.put_multi_async(entities_to_update)
         self.populate_success_response()
 
 
