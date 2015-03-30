@@ -14,8 +14,9 @@ class DefaultHandler(base.BaseHandler):
 class ClearAllEntry(base.BaseHandler):
     @ndb.toplevel
     def post(self):
+        ndb.delete_multi(models.Conversation.query().fetch(keys_only=True))
         ndb.delete_multi(models.User.query().fetch(keys_only=True))
         ndb.delete_multi(models.LikeState.query().fetch(keys_only=True))
         ndb.delete_multi(models.Item.query().fetch(keys_only=True))
-        ndb.delete_multi(models.Image().query().fetch(keys_only=True))
+        ndb.delete_multi(models.Image.query().fetch(keys_only=True))
         self.populate_success_response()

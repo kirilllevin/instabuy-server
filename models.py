@@ -23,7 +23,7 @@ class User(ndb.Model):
     ongoing_conversations = ndb.IntegerProperty(repeated=True)
 
     # The last time this user pinged for status.
-    last_active = ndb.DateTimeProperty(indexed=False)
+    last_active = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
 
 class Image(ndb.Model):
