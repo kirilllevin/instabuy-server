@@ -204,6 +204,7 @@ class List(base.BaseHandler):
                     location = document.field('location').value
                     item_dict = {
                         'item_id': document.doc_id,
+                        'seller_id': document.field('user_id').value,
                         'date_time_added': '',
                         'date_time_modified': '',
                         'title': document.field('title').value,

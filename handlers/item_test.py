@@ -132,6 +132,7 @@ class ListTest(test_utils.HandlerTest):
                             fields=fields))
         self.result_item_a = {
             u'item_id': unicode(new_item_a_key.id()),
+            u'seller_id': unicode(self.user_key.id() + 1),
             u'date_time_added': u'',
             u'date_time_modified': u'',
             u'title': u'new_item_a_title',
@@ -163,6 +164,7 @@ class ListTest(test_utils.HandlerTest):
                             fields=fields))
         self.result_item_b = {
             u'item_id': unicode(new_item_b_key.id()),
+            u'seller_id': unicode(self.user_key.id() + 1),
             u'date_time_added': u'',
             u'date_time_modified': u'',
             u'title': u'new_item_b_title',
