@@ -167,7 +167,7 @@ class List(base.BaseHandler):
         query = [
             'distance(location, geopoint({}, {})) < {}'.format(
                 self.args['lat'], self.args['lng'],
-                self.user.distance_radius_km),
+                self.user.distance_radius_km * 1000),
             'NOT user_id={}'.format(self.user.key.id())]
         if 'category' in self.args:
             query.append('category={}'.format(self.args['category']))

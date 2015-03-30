@@ -28,12 +28,12 @@ class BaseHandler(webapp2.RequestHandler):
         :return: True if the parse was successful, False if there were any
           errors in the supplied values.
         """
-        # We expect all requests to be JSON.
-        if self.request.content_type != 'application/json':
-            return False
         if self.request.method == 'GET':
-            args_dict = self.request.GET;
+            args_dict = self.request.GET
         elif self.request.method == 'POST':
+            # We expect all POST requests to be JSON.
+            if self.request.content_type != 'application/json':
+                return False
             args_dict = json.decode(self.request.body)
         else:
             return False
