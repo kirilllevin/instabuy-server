@@ -101,7 +101,7 @@ class BaseHandler(webapp2.RequestHandler):
             self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
             return False
         except user_utils.FacebookException as e:
-            self.populate_error_response(error_codes.FACEBOOK_ERROR, e)
+            self.populate_error_response(error_codes.FACEBOOK_ERROR, e.error)
             return False
 
         # Retrieve the User object for the given Facebook user id, if it exists.

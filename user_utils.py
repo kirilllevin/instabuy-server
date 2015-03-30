@@ -6,11 +6,11 @@ from google.appengine.api import urlfetch
 
 class FacebookException(Exception):
     """An exception in communicating with Facebook."""
-    def __init__(self, message):
-        self.message = message
+    def __init__(self, error):
+        self.error = error
 
-    def __str__(self):
-        return repr(self.message)
+    def __repr__(self):
+        return repr(self.error)
 
 
 class FacebookTokenExpiredException(Exception):
@@ -43,8 +43,9 @@ def get_facebook_user_id(fb_access_token):
         # Specially handle an expired token, since this is likely.
         if (error_message['type'] == 'OAuthException' and
                 error_message['code'] == 190 and
+                'error_subcode' in error_message and
                 error_message['error_subcode'] == 463):
             raise FacebookTokenExpiredException()
 
     # Wrap all other errors.
-    raise FacebookException(response.content)
+    raise FacebookException(json.loads(response.content))

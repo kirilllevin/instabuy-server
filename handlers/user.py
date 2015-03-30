@@ -25,7 +25,7 @@ class Register(base.BaseHandler):
             self.populate_error_response(error_codes.FACEBOOK_TOKEN_ERROR)
             return
         except user_utils.FacebookException as e:
-            self.populate_error_response(error_codes.FACEBOOK_ERROR, e)
+            self.populate_error_response(error_codes.FACEBOOK_ERROR, e.error)
             return
 
         # Check if the user is already registered.

@@ -18,12 +18,6 @@ class GetUploadUrl(base.BaseHandler):
 class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
     @ndb.toplevel
     def post(self):
-        success = self.parse_request(
-            {'item_id': (long, True, None)})
-        if not success:
-            self.populate_error_response(error_codes.MALFORMED_REQUEST)
-            return
-
         # Check that something was uploaded.
         uploads = self.get_uploads()
         if not uploads:
@@ -31,8 +25,21 @@ class Upload(blobstore_handlers.BlobstoreUploadHandler, base.BaseHandler):
             return
         image_key = uploads[0].key()
 
-        if not (self.populate_user() and
-                self.populate_item_for_mutation(self.args['item_id'])):
+        success = True
+        try:
+            item_id = self.request.POST['item_id']
+            if not item_id:
+                success = False
+            else:
+                item_id = long(item_id)
+        except ValueError:
+            success = False
+
+        if not success:
+            self.populate_error_response(error_codes.MALFORMED_REQUEST)
+
+        if not (success and self.populate_user() and
+                self.populate_item_for_mutation(item_id)):
             # Delete the blob.
             blobstore.delete(image_key)
             return
