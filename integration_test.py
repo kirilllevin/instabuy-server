@@ -15,11 +15,11 @@ def clear_all(headers):
     assert r.status_code == requests.codes.ok
 
 
-def register(headers, name):
+def auth(headers, name):
     user_data = {
         'name': name
     }
-    r = requests.post(_DEV_SERVER + '/user/register',
+    r = requests.post(_DEV_SERVER + '/user/auth',
                       data=json.dumps(user_data), headers=headers)
     assert r.status_code == requests.codes.ok
 
@@ -113,8 +113,8 @@ def main(argv=None):
     if 'clear_all' in actions:
         clear_all(headers)
 
-    if 'register' in actions:
-        register(headers, opts['name'] if 'name' in opts else 'name')
+    if 'auth' in actions:
+        auth(headers, opts['name'] if 'name' in opts else 'name')
 
     if 'post' in actions:
         post(headers)

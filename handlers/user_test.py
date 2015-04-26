@@ -6,17 +6,16 @@ import models
 import test_utils
 
 
-class RegisterTest(test_utils.HandlerTest):
+class AuthenticateTest(test_utils.HandlerTest):
     def test_new_user(self):
         # At first, there should be no account.
         user = models.User.query(models.User.third_party_id == '2').get()
         self.assertIsNone(user)
 
-        # Now register.
+        # Now authenticate.
         response = self.app.post(
-            '/user/register',
-            params=json.encode({'name': 'fake_name',
-                                'distance_radius_km': 20}),
+            '/user/auth',
+            params=json.encode({'name': 'fake_name'}),
             headers=self.headers_for_user(2))
         self.assertEqual(httplib.OK, response.status_int)
 
@@ -24,26 +23,33 @@ class RegisterTest(test_utils.HandlerTest):
         user = models.User.query(models.User.third_party_id == '2').get()
         self.assertIsNotNone(user)
         self.assertEqual('fake_name', user.name)
-        self.assertEqual(20, user.distance_radius_km)
+        self.assertIsNotNone(user.distance_radius_km)
 
-    def test_register_twice_is_error(self):
-        # Registering once works.
+    def test_auth_twice_is_idempotent(self):
+        # At first, there is just one user, which is the one from the test
+        # setup.
+        self.assertEqual(1, len(models.User.query().fetch(keys_only=True)))
+
+        # Authenticating once registers the user.
         response = self.app.post(
-            '/user/register',
+            '/user/auth',
             params=json.encode({'name': 'fake_name'}),
             headers=self.headers_for_user(2))
         self.assertEqual(httplib.OK, response.status_int)
 
-        # Registering a second time should give errors.
+        # There should be exactly two users now.
+        self.assertEqual(2, len(models.User.query().fetch(keys_only=True)))
+
+        # Authenticating a second time should do nothing.
         response = self.app.post(
-            '/user/register',
+            '/user/auth',
             params=json.encode({'name': 'fake_name2'}),
             headers=self.headers_for_user(2),
             expect_errors=True)
-        self.assertEqual(httplib.BAD_REQUEST, response.status_int)
-        response_body = json.decode(response.body)
-        self.assertEqual(error_codes.ACCOUNT_EXISTS.code,
-                         response_body['error']['error_code'])
+        self.assertEqual(httplib.OK, response.status_int)
+
+        # There should still be exactly two users.
+        self.assertEqual(2, len(models.User.query().fetch(keys_only=True)))
 
 
 class UpdateTest(test_utils.HandlerTest):

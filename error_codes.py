@@ -9,7 +9,6 @@ MALFORMED_REQUEST = _ErrorCode('MalformedRequest', 100)
 FACEBOOK_ERROR = _ErrorCode('FacebookError', 200)
 FACEBOOK_TOKEN_ERROR = _ErrorCode('FacebookTokenError', 201)
 
-ACCOUNT_EXISTS = _ErrorCode('AccountExists', 300)
 INVALID_ITEM = _ErrorCode('InvalidItem', 301)
 INVALID_USER = _ErrorCode('InvalidUser', 302)
 USER_PERMISSION_ERROR = _ErrorCode('UserPermissionError', 303)

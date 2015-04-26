@@ -6,12 +6,11 @@ import models
 import user_utils
 
 
-class Register(base.BaseHandler):
+class Authenticate(base.BaseHandler):
     @ndb.toplevel
     def post(self):
         success = self.parse_request(
-            {'name': (str, True, None),
-             'distance_radius_km': (int, False, lambda x: x > 0)})
+            {'name': (str, True, None)})
         if not success:
             self.populate_error_response(error_codes.MALFORMED_REQUEST)
             return
@@ -28,20 +27,18 @@ class Register(base.BaseHandler):
             self.populate_error_response(error_codes.FACEBOOK_ERROR, e.error)
             return
 
-        # Check if the user is already registered.
+        # Check if the user is already registered, and if so, just return.
         user = models.User.query(models.User.third_party_id == fb_user_id).get()
         if user:
-            self.populate_error_response(error_codes.ACCOUNT_EXISTS)
+            self.populate_success_response({'token': fb_access_token})
             return
 
         # Store a new user entry.
         user = models.User(login_type='facebook',
                            third_party_id=fb_user_id,
                            name=self.args['name'])
-        if 'distance_radius_km' in self.args:
-            user.distance_radius_km = self.args['distance_radius_km']
         user.put_async()
-        self.populate_success_response()
+        self.populate_success_response({'token': fb_access_token})
 
 
 class Update(base.BaseHandler):
